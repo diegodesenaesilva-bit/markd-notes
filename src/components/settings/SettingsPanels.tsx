@@ -54,6 +54,7 @@ const THEMES: Array<{
 
 import { useAiStore } from "@/stores/ai";
 import { testOnlineAiConnection } from "@/lib/ai";
+import { version as appVersion } from "../../../package.json";
 
 export function GeneralSettings() {
   const root = useVault((state) => state.root);
@@ -110,7 +111,7 @@ export function GeneralSettings() {
         ? "Installing…"
         : updateStatus === "checking"
           ? "Checking for updates…"
-          : `You're on version ${updateVersion || "0.1.6"}`;
+          : `You're on version ${updateVersion || appVersion}`;
 
   return (
     <div className="space-y-6">
