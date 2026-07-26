@@ -15,8 +15,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -25,8 +23,6 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -36,7 +32,7 @@ jobs:
       - name: Install frontend dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Get version from tauri.conf.json
+      - name: Get version
         id: version
         shell: powershell
         run: |
@@ -44,60 +40,16 @@ jobs:
           echo "version=$ver" >> $env:GITHUB_OUTPUT
           echo "tag=v$ver" >> $env:GITHUB_OUTPUT
 
-      - name: Build and sign Tauri Application
-        env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
-        run: npx tauri build --target x86_64-pc-windows-msvc
-
-      - name: Build latest.json from .nsis.zip.sig
-        id: manifest
-        shell: powershell
-        run: |
-          $ver = "${{ steps.version.outputs.version }}"
-          $tag = "${{ steps.version.outputs.tag }}"
-
-          # The .nsis.zip.sig file contains the actual updater signature
-          $sigFile = Get-ChildItem -Path "src-tauri/target" -Recurse -Filter "*.nsis.zip.sig" | Select-Object -First 1
-          if (-not $sigFile) {
-            Write-Error "ERROR: No .nsis.zip.sig file found! Tauri signing may have failed."
-            exit 1
-          }
-          $signature = (Get-Content $sigFile.FullName -Raw).Trim()
-          Write-Host "Signature file: $($sigFile.FullName)"
-          Write-Host "Signature: $signature"
-
-          # URL must point to the .nsis.zip file (Tauri updater protocol)
-          $zipUrl = "https://github.com/diegodesenaesilva-bit/markd-notes/releases/download/$tag/Markd_${ver}_x64-setup.nsis.zip"
-
-          $manifest = [ordered]@{
-            version  = $tag
-            notes    = "Markd $tag"
-            pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
-            platforms = [ordered]@{
-              "windows-x86_64" = [ordered]@{
-                signature = $signature
-                url       = $zipUrl
-              }
-            }
-          }
-
-          $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path latest.json -Encoding UTF8NoBOM
-          Write-Host "Generated latest.json:"
-          Get-Content latest.json
-
-      - name: Publish Release to GitHub
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: Markd ${{ steps.version.outputs.tag }}
-          files: |
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
-            latest.json
-          draft: false
-          prerelease: false
+      - name: Build and release with Tauri Action
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        with:
+          tagName: v__VERSION__
+          releaseName: "Markd v__VERSION__"
+          releaseBody: "Nova versão do Markd"
+          releaseDraft: false
+          prerelease: false
+          includeUpdaterJson: true
