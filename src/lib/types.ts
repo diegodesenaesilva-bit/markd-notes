@@ -100,6 +100,7 @@ export interface PublishedNoteStatus {
 
 export type View =
   | { type: "note"; rel: string }
+  | { type: "calendar" }
   | { type: "todos" }
   | { type: "bookmarks" }
   | { type: "canvas"; id?: string };

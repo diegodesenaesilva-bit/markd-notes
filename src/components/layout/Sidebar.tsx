@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import {
   ArrowDownToLine,
+  Book,
   Bookmark,
   BookPlus,
-  CheckSquare,
+  CalendarDays,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Copy,
   Edit2,
   FilePlus,
-  GripVertical,
   Palette,
   Plus,
   Search,
@@ -31,41 +32,48 @@ import { TrashModal } from "@/components/trash/TrashModal";
 import { useTrash } from "@/stores/trash";
 import { toast } from "sonner";
 
-type NavKey = "todos" | "bookmarks" | "canvas";
+type NavKey = "calendar" | "todos" | "bookmarks" | "canvas";
 
 interface NavItemConfig {
   key: NavKey;
   label: string;
   icon: React.ReactNode;
-  shortcutKey: "openTodos" | "openBookmarks" | "openCanvas";
-  viewType: "todos" | "bookmarks" | "canvas";
+  shortcutKey: "openCalendar" | "openTodos" | "openBookmarks" | "openCanvas";
+  viewType: "calendar" | "todos" | "bookmarks" | "canvas";
 }
 
 const ALL_NAV_ITEMS: Record<NavKey, NavItemConfig> = {
+  calendar: {
+    key: "calendar",
+    label: "Calendário",
+    icon: <CalendarDays size={16} strokeWidth={1.5} />,
+    shortcutKey: "openCalendar",
+    viewType: "calendar",
+  },
   todos: {
     key: "todos",
     label: "Tarefas",
-    icon: <CheckSquare size={15} strokeWidth={1.75} className="text-sky-500" />,
+    icon: <CheckCircle2 size={16} strokeWidth={1.5} />,
     shortcutKey: "openTodos",
     viewType: "todos",
   },
   bookmarks: {
     key: "bookmarks",
     label: "Bookmarks",
-    icon: <Bookmark size={15} strokeWidth={1.75} className="text-amber-500" />,
+    icon: <Bookmark size={16} strokeWidth={1.5} />,
     shortcutKey: "openBookmarks",
     viewType: "bookmarks",
   },
   canvas: {
     key: "canvas",
     label: "Moodboard",
-    icon: <Palette size={15} strokeWidth={1.75} className="text-purple-500" />,
+    icon: <Palette size={16} strokeWidth={1.5} />,
     shortcutKey: "openCanvas",
     viewType: "canvas",
   },
 };
 
-const DEFAULT_ORDER: NavKey[] = ["todos", "bookmarks", "canvas"];
+const DEFAULT_ORDER: NavKey[] = ["calendar", "todos", "bookmarks", "canvas"];
 
 function getStoredNavOrder(): NavKey[] {
   try {
@@ -85,7 +93,6 @@ function getStoredNavOrder(): NavKey[] {
 }
 
 export function Sidebar() {
-  const name = useVault((s) => s.name);
   const view = useVault((s) => s.view);
   const setView = useVault((s) => s.setView);
   const createNote = useVault((s) => s.createNote);
@@ -133,7 +140,10 @@ export function Sidebar() {
 
   const openNavTab = (key: NavKey, canvasId?: string) => {
     const openTab = useTabs.getState().open;
-    if (key === "todos") {
+    if (key === "calendar") {
+      openTab("__calendar__");
+      setView({ type: "calendar" });
+    } else if (key === "todos") {
       openTab("__todos__");
       setView({ type: "todos" });
     } else if (key === "bookmarks") {
@@ -152,7 +162,7 @@ export function Sidebar() {
       className="flex h-full w-[240px] shrink-0 flex-col border-r border-line-soft bg-panel"
     >
       {/* drag region + traffic-light clearance */}
-      <div data-tauri-drag-region className="flex h-12 items-end px-3 pb-1" />
+      <div data-tauri-drag-region className="flex h-10 items-end px-3 pb-1" />
 
       <div className="px-2 pb-2">
         <button
@@ -164,15 +174,6 @@ export function Sidebar() {
           <Search size={14} strokeWidth={2} className="shrink-0" />
           <span>Buscar…</span>
         </button>
-      </div>
-
-      <div className="flex items-center px-4 pb-2">
-        <span
-          className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-faint"
-          title={name}
-        >
-          {name}
-        </span>
       </div>
 
       <nav className="flex flex-col gap-0.5 px-2 pb-1">
@@ -240,7 +241,7 @@ export function Sidebar() {
 
               {/* Multi-Moodboard Projects Sub-List */}
               {isCanvasItem && canvasExpanded && (
-                <div className="pl-6 pr-1 my-0.5 flex flex-col gap-0.5">
+                <div className="pl-4 pr-1 my-0.5 flex flex-col gap-0.5">
                   {canvasList.map((meta) => {
                     const isMetaActive =
                       view?.type === "canvas" &&
@@ -298,6 +299,7 @@ export function Sidebar() {
                           />
                         ) : (
                           <>
+                            <Palette size={13.5} strokeWidth={1.5} className="mr-2 shrink-0 text-faint" />
                             <span className="truncate flex-1" title="Duplo clique para renomear">
                               {meta.name}
                             </span>
@@ -344,27 +346,30 @@ export function Sidebar() {
         })}
       </nav>
 
-      <div className="mx-4 my-2 border-t border-line-soft" />
+      <div className="mx-2 my-2 border-t border-line-soft" />
 
       <PinnedNotes />
 
-      <div className="flex items-center justify-between pl-4 pr-2 pb-1">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
-          CADERNOS
-        </span>
-        <div className="flex items-center gap-0.5">
-          <IconAction
-            label="Nova nota"
-            onClick={() => createNote(activeDir(useVault.getState()))}
-          >
-            <FilePlus size={14.5} strokeWidth={1.75} />
-          </IconAction>
-          <IconAction
-            label="Novo caderno"
-            onClick={() => createFolder("", "Novo Caderno")}
-          >
-            <BookPlus size={14.5} strokeWidth={1.75} />
-          </IconAction>
+      <div className="px-2">
+        <div className="flex h-8 items-center justify-between px-2.5 text-[12px] font-medium text-faint">
+          <div className="flex items-center gap-3">
+            <Book size={16} strokeWidth={1.5} className="shrink-0" />
+            <span>Cadernos</span>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <IconAction
+              label="Nova nota"
+              onClick={() => createNote(activeDir(useVault.getState()))}
+            >
+              <FilePlus size={14.5} strokeWidth={1.75} />
+            </IconAction>
+            <IconAction
+              label="Novo caderno"
+              onClick={() => createFolder("", "Novo Caderno")}
+            >
+              <BookPlus size={14.5} strokeWidth={1.75} />
+            </IconAction>
+          </div>
         </div>
       </div>
 
@@ -541,30 +546,27 @@ function PageLink({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={cx(
-        "group relative flex h-[30px] w-full items-center gap-1.5 rounded-md px-1.5 text-[13px] transition-colors duration-100 select-none",
+        "group relative flex h-[34px] w-full items-center justify-between rounded-lg px-2.5 text-[13.5px] transition-colors duration-100 select-none",
         active
-          ? "bg-active text-ink"
+          ? "bg-hover font-medium text-ink"
           : "text-muted hover:bg-hover hover:text-ink",
         isDragging && "opacity-40",
         isDragOver && "ring-1 ring-sky-500 bg-hover",
       )}
     >
-      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-faint hover:text-muted cursor-grab">
-        <GripVertical size={12} />
-      </span>
-
       <button
         type="button"
         aria-current={active ? "page" : undefined}
         onClick={onClick}
-        className="flex flex-1 items-center gap-2 text-left outline-none min-w-0"
+        className="flex flex-1 items-center gap-3 text-left outline-none min-w-0"
       >
-        {icon}
-        <span className="font-medium truncate">{label}</span>
+        <span className="shrink-0 text-muted group-hover:text-ink transition-colors">{icon}</span>
+        <span className="truncate">{label}</span>
       </button>
 
       {extraAction}
     </div>
   );
 }
+
 

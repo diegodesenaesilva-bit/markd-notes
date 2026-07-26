@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { ArrowRight, Bookmark, CheckSquare, ChevronLeft, ChevronRight, Edit2, FileText, Palette, X, XCircle } from "lucide-react";
+import { ArrowRight, Bookmark, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight, Edit2, FileText, Palette, X, XCircle } from "lucide-react";
 import { motion } from "motion/react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { ContextMenu, type MenuPosition } from "@/components/ui/ContextMenu";
@@ -14,6 +14,7 @@ import { toast } from "sonner";
 function getActiveTabId(view: View | null): string | null {
   if (!view) return null;
   if (view.type === "note") return view.rel;
+  if (view.type === "calendar") return "__calendar__";
   if (view.type === "todos") return "__todos__";
   if (view.type === "bookmarks") return "__bookmarks__";
   if (view.type === "canvas") return `__canvas:${view.id || "default"}__`;
@@ -22,7 +23,9 @@ function getActiveTabId(view: View | null): string | null {
 
 function activateTab(tabId: string) {
   const setView = useVault.getState().setView;
-  if (tabId === "__todos__") {
+  if (tabId === "__calendar__") {
+    setView({ type: "calendar" });
+  } else if (tabId === "__todos__") {
     setView({ type: "todos" });
   } else if (tabId === "__bookmarks__") {
     setView({ type: "bookmarks" });
@@ -84,7 +87,7 @@ export function TabBar() {
         ref={scrollRef}
         layoutRoot
         role="tablist"
-        className="flex min-w-0 flex-1 items-stretch overflow-x-auto [scrollbar-width:none] scroll-smooth"
+        className="flex min-w-0 flex-1 items-stretch gap-1 px-1 pt-1 overflow-x-auto [scrollbar-width:none] scroll-smooth"
       >
         {tabs.map((tabId, index) => (
           <Tab
@@ -117,10 +120,19 @@ function TabContent({ tabId, isEditing, editingName, setEditingName, onCommitRen
 }) {
   const canvasList = useCanvas((s) => s.canvasList);
 
+  if (tabId === "__calendar__") {
+    return (
+      <>
+        <CalendarDays size={14} strokeWidth={1.5} className="relative z-10 shrink-0" />
+        <span className="relative z-10 truncate font-medium">Calendário</span>
+      </>
+    );
+  }
+
   if (tabId === "__todos__") {
     return (
       <>
-        <CheckSquare size={13} strokeWidth={1.75} className="relative z-10 shrink-0 text-sky-500" />
+        <CheckCircle2 size={14} strokeWidth={1.5} className="relative z-10 shrink-0" />
         <span className="relative z-10 truncate font-medium">Tarefas</span>
       </>
     );
@@ -129,7 +141,7 @@ function TabContent({ tabId, isEditing, editingName, setEditingName, onCommitRen
   if (tabId === "__bookmarks__") {
     return (
       <>
-        <Bookmark size={13} strokeWidth={1.75} className="relative z-10 shrink-0 text-amber-500" />
+        <Bookmark size={14} strokeWidth={1.5} className="relative z-10 shrink-0" />
         <span className="relative z-10 truncate font-medium">Bookmarks</span>
       </>
     );
@@ -159,7 +171,7 @@ function TabContent({ tabId, isEditing, editingName, setEditingName, onCommitRen
 
     return (
       <>
-        <Palette size={13} strokeWidth={1.75} className="relative z-10 shrink-0 text-purple-500" />
+        <Palette size={14} strokeWidth={1.5} className="relative z-10 shrink-0" />
         <span className="relative z-10 truncate font-medium" title="Duplo clique para renomear">{label}</span>
       </>
     );
@@ -184,7 +196,7 @@ function TabContent({ tabId, isEditing, editingName, setEditingName, onCommitRen
 
   return (
     <>
-      <FileText size={13} strokeWidth={1.75} className="relative z-10 shrink-0 text-muted" />
+      <FileText size={14} strokeWidth={1.5} className="relative z-10 shrink-0 text-muted" />
       <span className="relative z-10 truncate font-medium" title="Duplo clique para renomear">{noteTitle(tabId)}</span>
     </>
   );
@@ -234,7 +246,7 @@ function Tab({
     setIsEditing(false);
   };
 
-  const isRenamable = tabId !== "__todos__" && tabId !== "__bookmarks__";
+  const isRenamable = tabId !== "__calendar__" && tabId !== "__todos__" && tabId !== "__bookmarks__";
 
   const closeOthers = () => {
     const allTabs = useTabs.getState().tabs;
@@ -260,8 +272,8 @@ function Tab({
         tabIndex={focusable ? 0 : -1}
         title={tabId}
         className={cx(
-          "group/tab relative flex h-full min-w-0 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 pl-3 pr-1.5 text-[12.5px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink",
-          active ? "text-ink" : "text-muted hover:text-ink",
+          "group/tab relative flex h-full min-w-0 max-w-[180px] shrink-0 cursor-pointer select-none items-center gap-1.5 pl-3 pr-1.5 text-[12.5px] rounded-t-xl transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink",
+          active ? "text-ink font-medium" : "text-muted hover:text-ink",
         )}
         onClick={() => {
           if (!active) activateTab(tabId);
@@ -305,10 +317,10 @@ function Tab({
           <motion.div
             layoutId="tab-active-fill"
             transition={SPRING_LAYOUT}
-            className="absolute inset-0 bg-bg"
+            className="absolute inset-0 bg-bg rounded-t-xl"
           />
         ) : (
-          <span className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-100 group-hover/tab:bg-hover/60 group-hover/tab:opacity-100" />
+          <span className="pointer-events-none absolute inset-0 rounded-t-xl opacity-0 transition-opacity duration-100 group-hover/tab:bg-hover/60 group-hover/tab:opacity-100" />
         )}
         <TabContent
           tabId={tabId}

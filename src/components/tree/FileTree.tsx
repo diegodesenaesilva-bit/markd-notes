@@ -192,7 +192,7 @@ function DragPreview({ node }: { node: TreeNode }) {
         <FileText size={14} strokeWidth={1.75} className="mr-2 text-faint" />
       )}
       <span className={cx("truncate", isFolder && "font-medium")}>
-        {node.name}
+        {isFolder ? node.name : node.name.replace(/\.md$/i, "")}
       </span>
     </div>
   );
@@ -294,7 +294,7 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
           isDragging && "opacity-40",
         )}
         style={{
-          paddingLeft: 8 + depth * 15,
+          paddingLeft: 16 + depth * 14,
         }}
         onClick={() => {
           api?.setFocusRel(node.rel);
@@ -369,7 +369,7 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
         ) : (
           <FileText
             size={14}
-            strokeWidth={1.75}
+            strokeWidth={1.5}
             className={cx("mr-2 shrink-0", isActive ? "text-ink" : "text-faint")}
           />
         )}
@@ -378,7 +378,7 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
           <RenameInput node={node} onDone={() => api?.setRenaming(null)} />
         ) : (
           <span className={cx("truncate flex-1", isFolder && "font-medium")}>
-            {node.name}
+            {isFolder ? node.name : node.name.replace(/\.md$/i, "")}
           </span>
         )}
 
@@ -422,8 +422,9 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
+                const displayName = isFolder ? node.name : node.name.replace(/\.md$/i, "");
                 void deleteEntry(node.rel);
-                toast.success(`"${node.name}" movido para a lixeira`, {
+                toast.success(`"${displayName}" movido para a lixeira`, {
                   action: {
                     label: "Desfazer",
                     onClick: () => {

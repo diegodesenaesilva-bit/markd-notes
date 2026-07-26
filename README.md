@@ -2,7 +2,7 @@
 
 **Local-first notes for people who write.**
 
-Markd is a fast notes app for macOS and Linux, built for people who care about speed, privacy, and ownership.
+Markd is a fast notes app built exclusively for Windows, designed for people who care about speed, privacy, and ownership.
 
 No accounts.
 No cloud.
@@ -12,30 +12,9 @@ Your notes live on your disk as plain `.md` files. Markd simply makes writing an
 
 ---
 
-## Installing on macOS
+## Installing on Windows
 
-Download the latest `.dmg` from [usemarkd.app](https://usemarkd.app) and drag Markd to Applications.
-
-Markd releases are Developer ID signed and notarized by Apple before distribution.
-
----
-
-## Installing on Linux
-
-Download the latest AppImage or Debian package from the [GitHub releases](https://github.com/starc007/markd/releases/latest) page.
-
-Run the AppImage:
-
-```bash
-chmod +x Markd_*_amd64.AppImage
-./Markd_*_amd64.AppImage
-```
-
-Or install the Debian package:
-
-```bash
-sudo apt install ./Markd_*_amd64.deb
-```
+Download the latest `.exe` setup installer or `.msi` package from the [GitHub releases](https://github.com/starc007/markd/releases/latest) page and run the setup.
 
 ---
 

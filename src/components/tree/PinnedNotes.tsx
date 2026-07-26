@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FileText, Pin, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Plus, Star, Trash2 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useMemo, useState } from "react";
 import {
@@ -36,9 +36,9 @@ export function PinnedNotes() {
 
   return (
     <section className="px-2 pb-1">
-      <div className="flex h-7 items-center gap-1.5 px-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
-        <Pin size={11.5} strokeWidth={2} />
-        <span>Pinned</span>
+      <div className="flex h-8 items-center gap-3 px-2.5 text-[12px] font-medium text-faint">
+        <Star size={16} strokeWidth={1.5} className="shrink-0" />
+        <span>Favoritos</span>
       </div>
 
       <div
@@ -123,7 +123,7 @@ function PinnedRow({
             ? "bg-active text-ink"
             : "text-muted hover:bg-hover hover:text-ink",
         )}
-        style={{ paddingLeft: 8 + depth * 15 }}
+        style={{ paddingLeft: 16 + depth * 14 }}
         onClick={activate}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -181,7 +181,7 @@ function PinnedRow({
         ) : (
           <FileText
             size={14}
-            strokeWidth={1.75}
+            strokeWidth={1.5}
             className={cx(
               "mr-2 shrink-0",
               isActive ? "text-ink" : "text-faint",
@@ -193,7 +193,7 @@ function PinnedRow({
           <RenameInput node={node} onDone={() => setRenaming(null)} />
         ) : (
           <span className={cx("truncate flex-1", isFolder && "font-medium")}>
-            {node.name}
+            {isFolder ? node.name : node.name.replace(/\.md$/i, "")}
           </span>
         )}
 
@@ -237,8 +237,9 @@ function PinnedRow({
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
+                const displayName = isFolder ? node.name : node.name.replace(/\.md$/i, "");
                 void deleteEntry(node.rel);
-                toast.success(`"${node.name}" movido para a lixeira`, {
+                toast.success(`"${displayName}" movido para a lixeira`, {
                   action: {
                     label: "Desfazer",
                     onClick: () => {

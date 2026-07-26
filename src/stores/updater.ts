@@ -57,8 +57,7 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
         });
         if (!silent) toast("You're on the latest version.");
       }
-    } catch (err: any) {
-      console.error("Updater error details:", err);
+    } catch (err) {
       // Dev builds, offline checks, and missing signatures all land here.
       set({
         status: "error",
@@ -67,7 +66,7 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
         releaseNotesOpen: false,
       });
       if (!silent) {
-        toast.error(err?.message || (typeof err === "string" ? err : JSON.stringify(err)) || "Update check failed.");
+        toast.error(err instanceof Error ? err.message : "Update check failed.");
       }
     }
   },

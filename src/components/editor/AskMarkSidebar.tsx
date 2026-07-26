@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import Markdown from "react-markdown";
 import {
   Sparkles,
   Check,
@@ -8,11 +9,18 @@ import {
   User,
   Plus,
   FileText,
+  CalendarDays,
+  CheckCircle2,
+  Palette,
   Settings,
 } from "lucide-react";
 import { chatWithOnlineAi, cleanAiMarkdown, type ChatMessage } from "@/lib/ai";
 import { useAiStore } from "@/stores/ai";
 import { useUi } from "@/stores/ui";
+import { useVault } from "@/stores/vault";
+import { useCalendar } from "@/stores/calendar";
+import { useTodos } from "@/stores/todos";
+import { useCanvas } from "@/stores/canvas";
 import { Spinner } from "@/components/ui/Spinner";
 import { GeminiIcon } from "@/components/ui/GeminiIcon";
 import { cx } from "@/lib/utils";
@@ -43,6 +51,7 @@ export function AskMarkSidebar({
   const [error, setError] = useState<string | null>(null);
 
   const uiStore = useUi();
+  const currentView = useVault((s) => s.view);
   const selectedText = propSelectedText ?? uiStore.activeNoteSelectedText;
   const noteTitle = propNoteTitle ?? uiStore.activeNoteTitle ?? "Nota Sem Título";
   const noteContent = propNoteContent ?? uiStore.activeNoteContent ?? "";
@@ -68,7 +77,6 @@ export function AskMarkSidebar({
   } = useAiStore();
 
   const setSettingsOpen = useUi((state) => state.setSettingsOpen);
-
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -94,6 +102,80 @@ export function AskMarkSidebar({
     (activeProvider === "claude" && !!claudeApiKey) ||
     (activeProvider === "qwen" && !!qwenApiKey);
 
+  const stripActionJson = (text: string): string => {
+    if (!text) return "";
+    return text
+      .replace(/```json[\s\S]*?```/gi, (match) => {
+        if (match.includes('"action"') || match.includes('action') || match.includes('add_')) {
+          return "";
+        }
+        return match;
+      })
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
+  const executeAiAction = (responseText: string): string[] => {
+    const executedLogs: string[] = [];
+    try {
+      const jsonMatches = responseText.match(/```json[\s\S]*?```/gi);
+      if (!jsonMatches) return executedLogs;
+
+      const processSingleAction = (data: any) => {
+        if (!data || typeof data !== "object") return;
+        // 1. Calendar Event
+        if (data.action === "add_calendar_event" && data.title) {
+          useCalendar.getState().addEvent({
+            title: data.title,
+            date: data.date || new Date().toISOString().split("T")[0],
+            startTime: data.startTime || "10:00",
+            endTime: data.endTime || "11:00",
+            category: data.category || "event",
+            description: data.description || "",
+          });
+          executedLogs.push(`Compromisso agendado: "${data.title}"`);
+        }
+        // 2. Todo
+        else if (data.action === "add_todo" && data.text) {
+          void useTodos.getState().addSmart({
+            text: data.text,
+            tags: Array.isArray(data.tags) ? data.tags : [],
+          });
+          executedLogs.push(`Tarefa criada: "${data.text}"`);
+        }
+        // 3. Canvas Node (Moodboard)
+        else if (data.action === "add_canvas_node" && (data.content || data.title)) {
+          useCanvas.getState().addNode({
+            type: data.type || "sticky",
+            title: data.title,
+            content: data.content || "",
+            color: data.color || "yellow",
+            x: 120 + Math.floor(Math.random() * 220),
+            y: 120 + Math.floor(Math.random() * 220),
+          });
+          executedLogs.push(`Item adicionado ao Moodboard: "${data.title || (data.content ? data.content.slice(0, 25) + '...' : 'Card')}"`);
+        }
+      };
+
+      for (const match of jsonMatches) {
+        const rawJson = match.replace(/^```json/i, "").replace(/```$/, "").trim();
+        try {
+          const data = JSON.parse(rawJson);
+          if (Array.isArray(data)) {
+            data.forEach(processSingleAction);
+          } else {
+            processSingleAction(data);
+          }
+        } catch {
+          // ignore non-matching code blocks
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return executedLogs;
+  };
+
   const handleSendMessage = async (userPrompt?: string) => {
     const textToSend = userPrompt || inputText;
     if (!textToSend.trim()) return;
@@ -113,14 +195,99 @@ export function AskMarkSidebar({
     setLoading(true);
     setError(null);
 
+    // Build context header based on active page view
+    let contextHeader = `[INSTRUÇÕES DE FORMATAÇÃO DA RESPOSTA]:
+1. Mantenha suas respostas diretas, bem estruturadas e amigáveis em Português do Brasil.
+2. Evite repetir blocos de texto excessivamente longos ou desnecessários.
+3. Se for executar ações (agendar compromissos, criar tarefas ou adicionar cards no moodboard), COLOQUE OS BLOCOS DE CÓDIGO JSON ESTRITAMENTE NO FINAL DA SUA RESPOSTA. O app executará as ações automaticamente e removerá o código JSON da visualização do usuário.
+
+`;
+    const viewType = currentView?.type || "note";
+
+    if (viewType === "calendar" && shareContext) {
+      const events = useCalendar.getState().events;
+      const eventsSummary = events.slice(0, 15).map(e => `- [${e.date} ${e.startTime}-${e.endTime}] ${e.title} (${e.category})`).join("\n");
+      contextHeader += `[CONTEXTO DA TELA ATUAL: AGENDA / CALENDÁRIO]:
+Data de Hoje: ${new Date().toISOString().split("T")[0]}
+Eventos Agendados Atuais:
+${eventsSummary || "(Nenhum evento agendado)"}
+
+INSTRUÇÕES DE AÇÃO NA AGENDA:
+Para agendar compromissos, inclua ao final da sua resposta blocos JSON com a ação "add_calendar_event" como no exemplo:
+\`\`\`json
+{
+  "action": "add_calendar_event",
+  "title": "Título do compromisso",
+  "date": "YYYY-MM-DD",
+  "startTime": "HH:MM",
+  "endTime": "HH:MM",
+  "category": "event"
+}
+\`\`\`
+Pode incluir múltiplos blocos se o usuário solicitar mais de um compromisso.
+\n\n`;
+    } else if (viewType === "todos" && shareContext) {
+      const todos = useTodos.getState().todos;
+      const todosSummary = todos.slice(0, 20).map(t => `- [${t.done ? "Concluída" : "Pendente"}] ${t.text} ${t.tags.length ? `(#${t.tags.join(" #")})` : ""}`).join("\n");
+      contextHeader += `[CONTEXTO DA TELA ATUAL: TAREFAS / TODOS]:
+Lista de Tarefas Atuais:
+${todosSummary || "(Nenhuma tarefa cadastrada)"}
+
+INSTRUÇÕES DE AÇÃO EM TAREFAS:
+Para criar tarefas, inclua ao final da sua resposta blocos JSON com a ação "add_todo" como no exemplo:
+\`\`\`json
+{
+  "action": "add_todo",
+  "text": "Descrição da tarefa",
+  "tags": ["tag1", "tag2"]
+}
+\`\`\`
+Pode incluir múltiplos blocos se o usuário solicitar mais de uma tarefa.
+\n\n`;
+    } else if (viewType === "canvas" && shareContext) {
+      const nodes = useCanvas.getState().nodes;
+      const canvasName = useCanvas.getState().canvasList.find(c => c.id === useCanvas.getState().currentCanvasId)?.name || "Moodboard";
+      const nodesSummary = nodes.slice(0, 20).map(n => `- [${n.type.toUpperCase()}] ${n.title ? n.title + ": " : ""}${n.content}`).join("\n");
+      contextHeader += `[CONTEXTO DA TELA ATUAL: MOODBOARD / QUADRO "${canvasName}"]:
+Itens e Ideias no Moodboard Atualmente:
+${nodesSummary || "(Moodboard vazio)"}
+
+INSTRUÇÕES DE AÇÃO NO MOODBOARD:
+Para ADICIONAR ou INCLUIR sticky notes ou cards diretamente na tela do Moodboard, inclua ao final da sua resposta um ou mais blocos JSON com a ação "add_canvas_node" como no exemplo:
+\`\`\`json
+{
+  "action": "add_canvas_node",
+  "type": "sticky",
+  "title": "Título do Card",
+  "content": "Conteúdo com a ideia ou referência",
+  "color": "yellow"
+}
+\`\`\`
+Cores aceitas para "color": "yellow", "blue", "green", "pink", "purple".
+Pode incluir múltiplos blocos se o usuário pedir para adicionar mais de uma ideia.
+\n\n`;
+    } else if (shareContext) {
+      contextHeader += `[CONTEXTO DA NOTA ATUAL]:
+Título: ${noteTitle}
+Conteúdo da Nota:
+---
+${selectedText || noteContent || "(Nota Vazia)"}
+---
+\n\n`;
+    }
+
     try {
       const responseText = await chatWithOnlineAi({
         messages: newMessages,
-        noteTitle: shareContext ? noteTitle : undefined,
-        noteContent: shareContext ? (selectedText || noteContent) : undefined,
+        noteTitle: viewType === "note" ? noteTitle : undefined,
+        noteContent: contextHeader + (shareContext ? (selectedText || noteContent) : ""),
       });
 
-      setMessages([...newMessages, { role: "assistant", text: responseText }]);
+      executeAiAction(responseText);
+
+      const cleanedText = stripActionJson(responseText);
+
+      setMessages([...newMessages, { role: "assistant", text: cleanedText }]);
     } catch (err: any) {
       setError(err.message || `Erro na comunicação com a IA.`);
     } finally {
@@ -131,6 +298,8 @@ export function AskMarkSidebar({
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
   };
+
+  const currentViewType = currentView?.type || "note";
 
   return (
     <div className={cx("relative flex h-full w-full flex-col bg-bg transition-all duration-200", !hideHeader && "border-l border-line shadow-2xl z-30")}>
@@ -202,7 +371,7 @@ export function AskMarkSidebar({
                 Olá, Diego
               </h2>
               <p className="text-xl font-medium text-ink">
-                Como posso ajudar com suas notas hoje?
+                Como posso ajudar com {currentViewType === "calendar" ? "sua agenda" : currentViewType === "todos" ? "suas tarefas" : currentViewType === "canvas" ? "seu moodboard" : "suas notas"} hoje?
               </p>
             </div>
 
@@ -210,45 +379,116 @@ export function AskMarkSidebar({
             {shareContext && (
               <div className="flex items-center justify-between rounded-xl border border-line bg-panel/70 p-2.5 text-xs text-ink shadow-xs">
                 <div className="flex items-center gap-2 min-w-0">
-                  <FileText size={15} className="text-purple-500 shrink-0" />
+                  {currentViewType === "calendar" ? (
+                    <CalendarDays size={15} className="text-blue-500 shrink-0" />
+                  ) : currentViewType === "todos" ? (
+                    <CheckCircle2 size={15} className="text-emerald-500 shrink-0" />
+                  ) : currentViewType === "canvas" ? (
+                    <Palette size={15} className="text-amber-500 shrink-0" />
+                  ) : (
+                    <FileText size={15} className="text-purple-500 shrink-0" />
+                  )}
                   <span className="truncate text-faint">
-                    Compartilhando <strong className="text-ink">"{noteTitle}"</strong>
+                    Contexto: <strong className="text-ink">
+                      {currentViewType === "calendar"
+                        ? "Agenda / Calendário"
+                        : currentViewType === "todos"
+                        ? "Lista de Tarefas"
+                        : currentViewType === "canvas"
+                        ? "Moodboard Ativo"
+                        : `Nota: "${noteTitle}"`}
+                    </strong>
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={() => setShareContext(false)}
                   className="text-faint hover:text-ink shrink-0 ml-1"
-                  title="Remover contexto da nota"
+                  title="Remover contexto"
                 >
                   <X size={14} />
                 </button>
               </div>
             )}
 
-            {/* Quick Action Pills */}
+            {/* Quick Action Pills based on active page */}
             <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => handleSendMessage("Resuma os pontos principais desta nota em marcadores")}
-                className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-              >
-                Resumir os pontos principais desta nota
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSendMessage("Corrija os erros de ortografia e melhore o estilo deste texto")}
-                className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-              >
-                Corrigir a ortografia e melhorar o estilo do texto
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSendMessage("Crie uma lista de tarefas detalhada a partir deste texto")}
-                className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-              >
-                Criar uma lista de tarefas a partir desta nota
-              </button>
+              {currentViewType === "calendar" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Marque uma reunião amanhã às 15:00 chamada 'Alinhamento do Projeto' na minha agenda")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    📅 Marcar compromisso na agenda
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Quais são meus compromissos agendados para hoje? Resuma em tópicos.")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    📋 Listar meus compromissos de hoje
+                  </button>
+                </>
+              ) : currentViewType === "todos" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Crie 3 tarefas prioritárias para a entrega do projeto com tags adequadas")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    ✅ Criar e formatar tarefas automaticamente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Organize minhas tarefas pendentes por ordem de prioridade e urgência")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    📌 Analisar e priorizar tarefas pendentes
+                  </button>
+                </>
+              ) : currentViewType === "canvas" ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Análise todas as ideias do moodboard atual, conecte os conceitos e sugira 3 novos sticky notes de referências")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    💡 Analisar ideias e adicionar referências no Moodboard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Crie um novo sticky note com inspirações de paleta de cores e tipografia para este moodboard")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    🎨 Incluir nota de design no Moodboard
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Resuma os pontos principais desta nota em marcadores")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    Resumir os pontos principais desta nota
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Corrija os erros de ortografia e melhore o estilo deste texto")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    Corrigir ortografia e melhorar o estilo do texto
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("Crie uma lista de tarefas detalhada a partir desta nota e adicione às minhas tarefas")}
+                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                  >
+                    Criar tarefas a partir desta nota
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -274,18 +514,24 @@ export function AskMarkSidebar({
               )}
             </div>
             <div
-              className={`max-w-[90%] rounded-2xl p-3 text-xs leading-relaxed ${
+              className={`max-w-[92%] rounded-2xl p-3 text-xs leading-relaxed ${
                 msg.role === "user"
                   ? "bg-purple-600 text-white rounded-br-none"
-                  : "bg-panel border border-line text-ink rounded-bl-none whitespace-pre-wrap"
+                  : "bg-panel border border-line text-ink rounded-bl-none overflow-hidden"
               }`}
             >
-              {msg.role === "assistant" ? cleanAiMarkdown(msg.text) : msg.text}
+              {msg.role === "assistant" ? (
+                <div className="space-y-2 select-text [&_p]:leading-relaxed [&_p]:my-1.5 [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-bold [&_h2]:mt-2.5 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1.5 [&_li]:my-0.5 [&_hr]:my-2.5 [&_hr]:border-line [&_code]:bg-hover [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-[11px] [&_pre]:bg-hover [&_pre]:p-2 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_blockquote]:border-l-2 [&_blockquote]:border-purple-500/50 [&_blockquote]:pl-2 [&_blockquote]:italic [&_strong]:font-semibold [&_strong]:text-ink">
+                  <Markdown>{cleanAiMarkdown(msg.text)}</Markdown>
+                </div>
+              ) : (
+                msg.text
+              )}
             </div>
 
             {/* Actions under assistant message */}
             {msg.role === "assistant" && (
-              <div className="flex items-center gap-2 pt-1 text-[11px] text-faint">
+              <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-faint">
                 <button
                   type="button"
                   onClick={() => handleCopy(cleanAiMarkdown(msg.text))}
@@ -293,7 +539,7 @@ export function AskMarkSidebar({
                 >
                   <Copy size={12} /> Copiar
                 </button>
-                {selectedText && (
+                {currentViewType === "note" && selectedText && (
                   <button
                     type="button"
                     onClick={() => handleInsertResult(cleanAiMarkdown(msg.text), true)}
@@ -302,13 +548,15 @@ export function AskMarkSidebar({
                     <Check size={12} /> Substituir Seleção
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleInsertResult(cleanAiMarkdown(msg.text), false)}
-                  className="flex items-center gap-1 hover:text-ink font-medium text-indigo-500"
-                >
-                  <ArrowRight size={12} /> Inserir na Nota
-                </button>
+                {currentViewType === "note" && (
+                  <button
+                    type="button"
+                    onClick={() => handleInsertResult(cleanAiMarkdown(msg.text), false)}
+                    className="flex items-center gap-1 hover:text-ink font-medium text-indigo-500"
+                  >
+                    <ArrowRight size={12} /> Inserir na Nota
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -318,7 +566,7 @@ export function AskMarkSidebar({
         {loading && (
           <div className="flex items-center gap-2 text-xs text-faint py-2">
             <Spinner size={16} />
-            <span>Mark IA está pensando e escrevendo...</span>
+            <span>Mark IA está processando e executando...</span>
           </div>
         )}
 
@@ -340,7 +588,15 @@ export function AskMarkSidebar({
             rows={2}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            placeholder="Pergunte algo ou peça para escrever..."
+            placeholder={
+              currentViewType === "calendar"
+                ? "Peça para agendar um compromisso ou consultar a agenda..."
+                : currentViewType === "todos"
+                ? "Peça para criar, formatar ou organizar tarefas..."
+                : currentViewType === "canvas"
+                ? "Peça para analisar ideias, buscar referências ou adicionar cards..."
+                : "Pergunte algo ou peça para escrever..."
+            }
             className="w-full bg-transparent px-2 text-xs text-ink outline-none placeholder:text-faint resize-none"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && inputText.trim() && !loading) {

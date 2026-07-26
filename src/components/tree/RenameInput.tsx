@@ -13,6 +13,8 @@ export function RenameInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const submitted = useRef(false);
 
+  const initialName = node.kind === "note" ? node.name.replace(/\.md$/i, "") : node.name;
+
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
@@ -23,13 +25,13 @@ export function RenameInput({
     submitted.current = true;
     const value = inputRef.current?.value.trim();
     onDone();
-    if (value && value !== node.name) void renameEntry(node.rel, value);
+    if (value && value !== initialName) void renameEntry(node.rel, value);
   };
 
   return (
     <input
       ref={inputRef}
-      defaultValue={node.name}
+      defaultValue={initialName}
       className="w-full min-w-0 rounded-sm bg-bg px-1 text-[13px] text-ink outline-none ring-1 ring-line"
       onClick={(event) => event.stopPropagation()}
       onBlur={submit}

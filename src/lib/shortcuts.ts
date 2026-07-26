@@ -4,6 +4,7 @@ export type ShortcutAction =
   | "replaceInNote"
   | "newNote"
   | "dailyNote"
+  | "openCalendar"
   | "openTodos"
   | "openBookmarks"
   | "openCanvas"
@@ -32,6 +33,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: "replaceInNote", label: "Find and replace" },
   { id: "newNote", label: "New note" },
   { id: "dailyNote", label: "Today's note" },
+  { id: "openCalendar", label: "Open Calendar" },
   { id: "openTodos", label: "Open Todos" },
   { id: "openBookmarks", label: "Open Bookmarks" },
   { id: "openCanvas", label: "Open Moodboard Canvas" },
@@ -55,6 +57,7 @@ export function defaultShortcutBindings(
     replaceInNote: { ctrl: true, alt: true, key: "f" },
     newNote: { ...mod, key: "n" },
     dailyNote: { ...mod, shift: true, key: "y" },
+    openCalendar: { ...mod, shift: true, key: "c" },
     openTodos: { ...mod, shift: true, key: "t" },
     openBookmarks: { ...mod, shift: true, key: "b" },
     openCanvas: { ...mod, shift: true, key: "m" },

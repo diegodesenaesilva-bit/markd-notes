@@ -1,6 +1,6 @@
 # Markd — agent guide
 
-Local-first markdown notes app for macOS and GNU/Linux. Tauri 2 (Rust) + React 19 + Vite + Tailwind v4 + Tiptap 3 + Zustand.
+Local-first markdown notes app for Windows. Tauri 2 (Rust) + React 19 + Vite + Tailwind v4 + Tiptap 3 + Zustand.
 
 ## Commands
 
@@ -8,8 +8,7 @@ Local-first markdown notes app for macOS and GNU/Linux. Tauri 2 (Rust) + React 1
 - `bun run build` — typecheck (tsc) + vite production build
 - `bunx tsc --noEmit` — typecheck only
 - `cd src-tauri && cargo test` — Rust unit tests
-- `bun run release`: full signed and notarized macOS release (scripts/release.sh)
-- `.github/workflows/release-linux.yml`: signed x86_64 AppImage and Debian release
+- `.github/workflows/release-windows.yml`: Windows x64 installer release workflow
 
 ## Architecture
 
@@ -55,7 +54,11 @@ Blocking dialogs (`blocking_pick_folder`) must run in async commands via `spawn_
 - Strict monochrome: only the semantic tokens in `styles.css` (`bg`, `panel`, `sunken`, `ink`, `muted`, `faint`, `line`, `hover`, `active`, `invert`…). `sunken` is the recessed surface (tab strip), darker than `panel`. Never hardcode colors; `danger` is the sole exception, for destructive actions.
 - Dark mode = `.dark` class on `<html>`; themes: system/light/dark.
 - Active/selected rows use inverted style (`bg-invert text-invert-ink`) — the signature look.
-- Motion: 100–160ms ease-out only. Fonts: Inter Variable (UI), JetBrains Mono (code).
+- Icon Sizing & Alignment Standards:
+  - Category nav items (`Calendário`, `Tarefas`, `Bookmarks`, `Moodboard`) and section headers (`Favoritos`, `Cadernos`) share standard category icon size `16px` (`strokeWidth={1.5}`), left padding `px-2.5`, and `gap-3` (12px) for precise vertical alignment.
+  - Category icons MUST be identical across Sidebar and TabBar (`CalendarDays` for Calendário, `CheckCircle2` for Tarefas, `Bookmark` for Bookmarks, `Palette` for Moodboard, `FileText` for Notes).
+  - Sub-items / inner items (notes, folders, moodboards) use smaller icons (`14px` / `13.5px`, `strokeWidth={1.5}`) with indented padding.
+- Motion: 100–160ms ease-out only. Fonts: Inter Variable (UI), JetBrains Mono (code). Single unified font across all UI components.
 - No autocorrect anywhere: global `focusin` hook in `main.tsx` handles inputs; editor sets its own attrs.
 
 ## Adding beui components

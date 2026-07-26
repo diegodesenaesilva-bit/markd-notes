@@ -37,10 +37,15 @@ export function WindowControls() {
     }
   }, []);
 
-  const handleMinimize = (e: React.MouseEvent) => {
+  const handleMinimize = (e: React.SyntheticEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (isTauri()) {
-      void getCurrentWindow().minimize().catch(() => {});
+      try {
+        void getCurrentWindow().minimize();
+      } catch {
+        // Fallback
+      }
     } else {
       setIsWebMinimized(true);
       toast("Markd minimizado", {
@@ -49,7 +54,8 @@ export function WindowControls() {
     }
   };
 
-  const handleMaximizeToggle = async (e: React.MouseEvent) => {
+  const handleMaximizeToggle = async (e: React.SyntheticEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (isTauri()) {
       try {
@@ -57,7 +63,7 @@ export function WindowControls() {
         await appWindow.toggleMaximize();
         setIsMaximized(await appWindow.isMaximized());
       } catch {
-        // Ignore
+        // Fallback
       }
     } else {
       try {
@@ -81,10 +87,15 @@ export function WindowControls() {
     }
   };
 
-  const handleClose = (e: React.MouseEvent) => {
+  const handleClose = (e: React.SyntheticEvent) => {
+    e.preventDefault();
     e.stopPropagation();
     if (isTauri()) {
-      void getCurrentWindow().close().catch(() => {});
+      try {
+        void getCurrentWindow().close();
+      } catch {
+        // Fallback
+      }
     } else {
       try {
         window.close();
@@ -98,6 +109,8 @@ export function WindowControls() {
       }, 100);
     }
   };
+
+  const noDragStyle = { WebkitAppRegion: "no-drag" } as React.CSSProperties;
 
   return (
     <>
@@ -129,16 +142,18 @@ export function WindowControls() {
 
       {/* Main Control Buttons */}
       <div
-        className="flex items-center shrink-0 self-stretch"
-        style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+        className="z-30 flex items-center shrink-0 self-stretch select-none"
+        style={noDragStyle}
       >
         {/* Minimize */}
         <button
           type="button"
-          onMouseDown={(e) => e.stopPropagation()}
+          style={noDragStyle}
+          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onClick={handleMinimize}
           title="Minimizar"
-          className="grid h-full w-10 place-items-center text-faint transition-colors duration-100 hover:bg-hover hover:text-ink"
+          className="grid h-full w-10 place-items-center text-faint transition-colors duration-100 hover:bg-hover hover:text-ink cursor-pointer"
         >
           <Minus size={13} strokeWidth={1.75} />
         </button>
@@ -146,10 +161,12 @@ export function WindowControls() {
         {/* Maximize / Restore */}
         <button
           type="button"
-          onMouseDown={(e) => e.stopPropagation()}
+          style={noDragStyle}
+          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onClick={handleMaximizeToggle}
           title={isMaximized ? "Restaurar" : "Maximizar"}
-          className="grid h-full w-10 place-items-center text-faint transition-colors duration-100 hover:bg-hover hover:text-ink"
+          className="grid h-full w-10 place-items-center text-faint transition-colors duration-100 hover:bg-hover hover:text-ink cursor-pointer"
         >
           {isMaximized ? (
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -164,10 +181,12 @@ export function WindowControls() {
         {/* Close */}
         <button
           type="button"
-          onMouseDown={(e) => e.stopPropagation()}
+          style={noDragStyle}
+          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+          onPointerDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
           onClick={handleClose}
           title="Fechar"
-          className="grid h-full w-10 place-items-center text-faint transition-colors duration-100 hover:bg-red-500 hover:text-white"
+          className="grid h-full w-10 place-items-center text-faint transition-colors duration-100 hover:bg-red-500 hover:text-white cursor-pointer"
         >
           <X size={14} strokeWidth={1.75} />
         </button>

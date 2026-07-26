@@ -32,6 +32,7 @@ import { TabBar } from "@/components/editor/TabBar";
 import { BookmarksPage } from "@/components/bookmarks/BookmarksPage";
 import { TodosPage } from "@/components/todos/TodosPage";
 import { CanvasPage } from "@/components/canvas/CanvasPage";
+import { CalendarPage } from "@/components/calendar/CalendarPage";
 import { EASE_OUT, SPRING_LAYOUT, SPRING_PANEL } from "@/lib/ease";
 import { cx, isMac, isTauri } from "@/lib/utils";
 import {
@@ -105,11 +106,11 @@ export function AppShell() {
 
       <main className="relative flex min-w-0 flex-1 flex-col">
         {/* Row 1 — titlebar: sidebar toggle + open-note tabs + window controls.
-            WindowControls sits OUTSIDE the drag region so clicks reach it. */}
-        <div className="relative flex h-11 shrink-0 bg-sunken">
+            WindowControls sits side-by-side outside the drag region so clicks reach it. */}
+        <div className="relative flex h-11 shrink-0 items-stretch bg-sunken">
           <motion.div
             data-tauri-drag-region
-            className="flex flex-1 items-stretch gap-1.5 pr-[120px]"
+            className="flex min-w-0 flex-1 items-stretch gap-1.5"
             animate={{ paddingLeft: sidebarHidden ? 84 : 10 }}
             initial={false}
             transition={SPRING_PANEL}
@@ -118,6 +119,7 @@ export function AppShell() {
               <Tooltip label="Toggle sidebar ⌘\" side="right">
                 <button
                   type="button"
+                  style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
                   onClick={toggleSidebar}
                   className="grid h-7 w-7 place-items-center rounded-md text-faint transition-colors duration-100 hover:bg-hover hover:text-ink"
                 >
@@ -127,9 +129,11 @@ export function AppShell() {
             </div>
             <TabBar />
           </motion.div>
-          {/* Window controls positioned absolutely so they are NEVER inside
-              the drag region — this guarantees click events are not swallowed */}
-          <div className="absolute right-0 top-0 bottom-0 flex items-stretch">
+          {/* Window controls placed as a flex sibling outside the drag region */}
+          <div
+            className="z-30 flex shrink-0 items-stretch"
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+          >
             <WindowControls />
           </div>
         </div>
@@ -144,17 +148,19 @@ export function AppShell() {
               animation="cascade"
               className="text-[14px] font-semibold text-ink"
             >
-              {view?.type === "todos"
-                ? "Todos"
-                : view?.type === "bookmarks"
-                  ? "Bookmarks"
-                  : ""}
+              {view?.type === "calendar"
+                ? "Calendário"
+                : view?.type === "todos"
+                  ? "Tarefas"
+                  : view?.type === "bookmarks"
+                    ? "Bookmarks"
+                    : ""}
             </ActionSwapText>
           )}
 
           <LayoutGroup>
             <div className="ml-auto flex items-center gap-2">
-              {view?.type === "note" && !rightPanelOpen && (
+              {!rightPanelOpen && (
                 <>
                   <Tooltip label="Peça ao Gemini (Assistente Gemini IA)" side="bottom">
                     <button
@@ -352,6 +358,11 @@ export function AppShell() {
           {/* Workspace stays mounted (hidden) across view switches — open
               tabs keep their live editors, so returning to notes is instant. */}
           <NotesWorkspace visible={view?.type === "note"} />
+          {view?.type === "calendar" && (
+            <div className="absolute inset-0">
+              <CalendarPage />
+            </div>
+          )}
           {view?.type === "todos" && (
             <div className="absolute inset-0">
               <TodosPage />

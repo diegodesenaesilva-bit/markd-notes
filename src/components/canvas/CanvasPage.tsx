@@ -12,6 +12,8 @@ import {
   Maximize2,
   MousePointer,
   Palette,
+  RotateCcw,
+  RotateCw,
   SendToBack,
   Sparkles,
   Square,
@@ -124,6 +126,8 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [resizingNodeId, setResizingNodeId] = useState<string | null>(null);
   const [resizeStart, setResizeStart] = useState({ w: 0, h: 0, x: 0, y: 0 });
+  const [rotatingNodeId, setRotatingNodeId] = useState<string | null>(null);
+  const [rotateCenter, setRotateCenter] = useState({ x: 0, y: 0 });
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
   const [imageUrlModal, setImageUrlModal] = useState(false);
   const [inputImageUrl, setInputImageUrl] = useState("");
@@ -192,26 +196,51 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
     setActiveTool,
   ]);
 
-  // Wheel pan / zoom
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+  // Native non-passive wheel event listener for smooth Ctrl + Scroll zoom & canvas panning
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+
       if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
+        // Ctrl + Scroll: Zoom in/out centered on mouse pointer
         const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+        const currentZoom = useCanvas.getState().viewport.zoom;
         const newZoom = Math.min(
           2.5,
-          Math.max(0.25, Number((viewport.zoom * zoomFactor).toFixed(2))),
+          Math.max(0.25, Number((currentZoom * zoomFactor).toFixed(2))),
         );
-        setViewport({ zoom: newZoom });
+
+        const rect = el.getBoundingClientRect();
+        const cursorX = e.clientX - rect.left;
+        const cursorY = e.clientY - rect.top;
+
+        const currentViewport = useCanvas.getState().viewport;
+        const newX = cursorX - (cursorX - currentViewport.x) * (newZoom / currentZoom);
+        const newY = cursorY - (cursorY - currentViewport.y) * (newZoom / currentZoom);
+
+        useCanvas.getState().setViewport({
+          zoom: newZoom,
+          x: Math.round(newX),
+          y: Math.round(newY),
+        });
       } else {
-        setViewport({
-          x: viewport.x - e.deltaX,
-          y: viewport.y - e.deltaY,
+        // Normal Scroll: Pan canvas
+        const currentViewport = useCanvas.getState().viewport;
+        useCanvas.getState().setViewport({
+          x: Math.round(currentViewport.x - e.deltaX),
+          y: Math.round(currentViewport.y - e.deltaY),
         });
       }
-    },
-    [viewport, setViewport],
-  );
+    };
+
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+    };
+  }, []);
 
   // Convert screen coordinates to canvas space
   const screenToCanvas = useCallback(
@@ -292,6 +321,27 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
       return;
     }
 
+    if (rotatingNodeId) {
+      const pos = screenToCanvas(e.clientX, e.clientY);
+      const dx = pos.x - rotateCenter.x;
+      const dy = pos.y - rotateCenter.y;
+      let deg = Math.round((Math.atan2(dy, dx) * 180) / Math.PI + 90);
+      deg = ((deg % 360) + 360) % 360;
+      if (deg > 180) deg -= 360;
+
+      const snapThreshold = e.shiftKey ? 15 : 5;
+      const snapAngles = [0, 45, 90, 135, 180, -45, -90, -135];
+      for (const snap of snapAngles) {
+        if (Math.abs(deg - snap) <= snapThreshold) {
+          deg = snap;
+          break;
+        }
+      }
+
+      updateNode(rotatingNodeId, { rotation: deg });
+      return;
+    }
+
     if (draggingNodeId) {
       const pos = screenToCanvas(e.clientX, e.clientY);
       updateNode(draggingNodeId, {
@@ -320,6 +370,9 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
       } catch {
         // non-fatal
       }
+    }
+    if (rotatingNodeId) {
+      setRotatingNodeId(null);
     }
     if (draggingNodeId) {
       setDraggingNodeId(null);
@@ -360,6 +413,18 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
       y: pos.y - node.y,
     });
     bringToFront([node.id]);
+  };
+
+  // Start rotate node
+  const handleRotatePointerDown = (
+    e: React.PointerEvent,
+    node: CanvasNode,
+  ) => {
+    e.stopPropagation();
+    setRotatingNodeId(node.id);
+    const centerX = node.x + node.width / 2;
+    const centerY = node.y + node.height / 2;
+    setRotateCenter({ x: centerX, y: centerY });
   };
 
   // Start resize node
@@ -552,7 +617,6 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onWheel={handleWheel}
         onDragOver={(e) => e.preventDefault()}
         onDrop={handleDrop}
         className={cx(
@@ -815,6 +879,20 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
                   ) : null}
                 </div>
 
+                {/* Top Center Rotation Handle */}
+                {isSelected && (
+                  <div
+                    onPointerDown={(e) => handleRotatePointerDown(e, node)}
+                    className="absolute -top-7 left-1/2 -translate-x-1/2 flex flex-col items-center cursor-grab active:cursor-grabbing z-30 group/rotate"
+                    title="Arraste para rotacionar objeto (Segure Shift para alinhar em 45°)"
+                  >
+                    <div className="w-5.5 h-5.5 rounded-full bg-panel border border-line shadow-sm flex items-center justify-center text-faint hover:text-ink hover:border-sky-500 hover:scale-110 transition-transform">
+                      <RotateCw size={11} />
+                    </div>
+                    <div className="w-px h-2 bg-sky-500/80" />
+                  </div>
+                )}
+
                 {/* Bottom Corner Resize Handle */}
                 <div
                   onPointerDown={(e) => handleResizePointerDown(e, node)}
@@ -893,6 +971,51 @@ export function CanvasPage({ canvasId = "default" }: { canvasId?: string }) {
               <SendToBack size={13} />
             </button>
           </Tooltip>
+
+          <div className="h-4 w-px bg-line-soft" />
+
+          {/* Rotation Controls */}
+          <div className="flex items-center gap-0.5">
+            <Tooltip label="Rotacionar -15°">
+              <button
+                type="button"
+                onClick={() => {
+                  const cur = selectedNode.rotation || 0;
+                  let next = cur - 15;
+                  if (next < -180) next += 360;
+                  updateNode(selectedNode.id, { rotation: next });
+                }}
+                className="p-1.5 rounded-lg text-faint hover:text-ink hover:bg-hover"
+              >
+                <RotateCcw size={13} />
+              </button>
+            </Tooltip>
+
+            <Tooltip label="Resetar Rotação (0°)">
+              <button
+                type="button"
+                onClick={() => updateNode(selectedNode.id, { rotation: 0 })}
+                className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-medium text-faint hover:text-ink hover:bg-hover"
+              >
+                {selectedNode.rotation ? `${selectedNode.rotation}°` : "0°"}
+              </button>
+            </Tooltip>
+
+            <Tooltip label="Rotacionar +15°">
+              <button
+                type="button"
+                onClick={() => {
+                  const cur = selectedNode.rotation || 0;
+                  let next = cur + 15;
+                  if (next > 180) next -= 360;
+                  updateNode(selectedNode.id, { rotation: next });
+                }}
+                className="p-1.5 rounded-lg text-faint hover:text-ink hover:bg-hover"
+              >
+                <RotateCw size={13} />
+              </button>
+            </Tooltip>
+          </div>
 
           <div className="h-4 w-px bg-line-soft" />
 

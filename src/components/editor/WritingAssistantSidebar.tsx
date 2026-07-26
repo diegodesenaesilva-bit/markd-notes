@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Markdown from "react-markdown";
 import { Copy, Check, Sparkles, Send, PenTool, MessageSquare, Briefcase, X } from "lucide-react";
 import { chatWithOnlineAi } from "@/lib/ai";
 import { Spinner } from "@/components/ui/Spinner";
@@ -103,7 +104,6 @@ Responda APENAS no seguinte formato estrito em Português do Brasil:
 
       setResult(newResult);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(newResult));
-      toast.success("Versões geradas com sucesso!");
     } catch (err: any) {
       toast.error("Erro ao gerar versões com a IA: " + (err?.message || "Erro desconhecido"));
     } finally {
@@ -194,9 +194,9 @@ Responda APENAS no seguinte formato estrito em Português do Brasil:
                   <span>{copiedFormal ? "Copiado!" : "Copiar"}</span>
                 </button>
               </div>
-              <p className="text-[12.5px] leading-relaxed text-ink select-text whitespace-pre-wrap">
-                {result.formal}
-              </p>
+              <div className="text-[12.5px] leading-relaxed text-ink select-text [&_p]:leading-relaxed [&_p]:my-1 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4">
+                <Markdown>{result.formal}</Markdown>
+              </div>
             </div>
 
             {/* Version 2: Friendly */}
@@ -215,9 +215,9 @@ Responda APENAS no seguinte formato estrito em Português do Brasil:
                   <span>{copiedFriendly ? "Copiado!" : "Copiar"}</span>
                 </button>
               </div>
-              <p className="text-[12.5px] leading-relaxed text-ink select-text whitespace-pre-wrap">
-                {result.friendly}
-              </p>
+              <div className="text-[12.5px] leading-relaxed text-ink select-text [&_p]:leading-relaxed [&_p]:my-1 [&_strong]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4">
+                <Markdown>{result.friendly}</Markdown>
+              </div>
             </div>
 
             {/* Refinement input */}

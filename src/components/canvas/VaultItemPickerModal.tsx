@@ -21,7 +21,11 @@ export function VaultItemPickerModal({
   const flattenNodes = (nodes: TreeNode[]): { rel: string; name: string; kind: "folder" | "note" }[] => {
     let result: { rel: string; name: string; kind: "folder" | "note" }[] = [];
     for (const node of nodes) {
-      result.push({ rel: node.rel, name: node.name, kind: node.kind });
+      result.push({
+        rel: node.rel,
+        name: node.kind === "note" ? node.name.replace(/\.md$/i, "") : node.name,
+        kind: node.kind,
+      });
       if (node.children) {
         result = result.concat(flattenNodes(node.children));
       }

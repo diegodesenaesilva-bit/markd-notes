@@ -110,7 +110,7 @@ export function GeneralSettings() {
         ? "Installing…"
         : updateStatus === "checking"
           ? "Checking for updates…"
-          : `You're on version ${updateVersion || "0.2.0"}`;
+          : `You're on version ${updateVersion || "0.1.6"}`;
 
   return (
     <div className="space-y-6">

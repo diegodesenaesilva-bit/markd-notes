@@ -21,6 +21,11 @@ document.addEventListener("focusin", (event) => {
   }
 });
 
+// Suppress default native browser right-click context menu across the app.
+document.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+});
+
 let windowLabel = "main";
 try {
   if (isTauri()) {

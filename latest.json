@@ -1,11 +1,12 @@
 {
-  "version": "v0.2.0",
-  "notes": "Markd v0.2.0",
-  "pub_date": "2026-07-26T17:01:07.166Z",
+  "version": "0.1.6",
+  "notes": "Publish linked notes and images as one connected site. Find and replace text, customize shortcuts, edit typed properties inline, and keep notes directly in your vault root.",
+  "pub_date": "2026-07-20T19:02:07.163Z",
+  "release_type": "feature",
   "platforms": {
-    "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSTHZsc0w0WGg5cTJTT0dLVUQ4blhBNG05cFBwM29GVVVSMStvMGxBK2NoRm95cHczV3FHdjh0blVZUUxaWHVWaU5NWkNYZGlvRXo4NDhEUk4rRDFwclBUa3dvWDdzSXcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MDg1MjY3CWZpbGU6TWFya2RfMC4yLjBfeDY0LXNldHVwLmV4ZQplMnE4Vm9zVUNKazBGQlJTVHl1QTNpQXNVZWhFTndCenBTTjJibWZyS2NxMm82NUlMYUhWS2dlQ0MvSDYvN0JjcDY2b0lhcWE1eUNUSWh0UDlTOUVEQT09Cg==",
-      "url": "https://github.com/diegodesenaesilva-bit/markd-notes/releases/download/v0.2.0/Markd_0.2.0_x64-setup.exe"
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUais5QS9oMXBYdFdqQjV5Nkp2cm14WWJxUDkwSm1sYklYdm9raVY5aXB6QnIxL243ZmMrQzUvZnZiYU1OWnJxR042cEdwbE5tbW4xN1pKT0NrZkNxVS9tVTlyYXhYZnc4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NTc0MDEzCWZpbGU6TWFya2QuYXBwLnRhci5negpPbjk3a2JYaG1WNTVFd3ZSUVF2RytySm1EZjFCQkFPR292WEMzeThIQlJDSi9ZWUxDdTJVSVlDZytJTlA5U2pwT2FCcWNGWHVBMkRHcjduTVBNMWFEQT09Cg==",
+      "url": "https://github.com/starc007/markd/releases/download/v0.1.6/Markd.app.tar.gz"
     }
   }
 }

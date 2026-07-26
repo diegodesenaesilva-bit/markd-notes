@@ -129,6 +129,13 @@ export function CommandPalette() {
         run: () => void vault.openDailyNote(),
       },
       {
+        id: "calendar",
+        label: "Open Calendar",
+        hint: formatShortcutText(shortcuts.openCalendar, mac),
+        icon: CalendarDays,
+        run: () => vault.setView({ type: "calendar" }),
+      },
+      {
         id: "todos",
         label: "Open Todos",
         hint: formatShortcutText(shortcuts.openTodos, mac),
@@ -170,7 +177,7 @@ export function CommandPalette() {
       .slice(0, 6)
       .map((node) => ({
         id: `note-${node.rel}`,
-        label: node.name,
+        label: node.kind === "note" ? node.name.replace(/\.md$/i, "") : node.name,
         path: folderRoute(node.rel),
         icon: FileText,
         run: () => {

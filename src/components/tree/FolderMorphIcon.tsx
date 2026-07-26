@@ -32,7 +32,7 @@ export function FolderMorphIcon({
         transition={transition}
         className="absolute inset-0"
       >
-        <Book className="h-full w-full text-amber-600/80 dark:text-amber-400/80" strokeWidth={1.75} />
+        <Book className="h-full w-full" strokeWidth={1.75} />
       </motion.span>
       <motion.span
         initial={false}
@@ -46,7 +46,7 @@ export function FolderMorphIcon({
         transition={transition}
         className="absolute inset-0"
       >
-        <BookOpen className="h-full w-full text-amber-600 dark:text-amber-400" strokeWidth={1.75} />
+        <BookOpen className="h-full w-full" strokeWidth={1.75} />
       </motion.span>
     </span>
   );

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Markdown from "react-markdown";
 import { Sparkles, Check, Copy, X, ArrowRight, Key } from "lucide-react";
 import { askMark } from "@/lib/ai";
 import { useAiStore } from "@/stores/ai";
@@ -189,8 +190,8 @@ export function AskMarkModal({
               {result && !loading && (
                 <div className="space-y-3">
                   <label className="block text-xs font-medium text-faint">Resultado:</label>
-                  <div className="max-h-48 overflow-y-auto rounded-lg border border-line bg-muted p-3 text-sm text-ink whitespace-pre-wrap">
-                    {result}
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-line bg-muted p-3 text-sm text-ink select-text [&_p]:leading-relaxed [&_p]:my-1.5 [&_h1]:text-base [&_h1]:font-bold [&_h1]:mt-2 [&_h2]:text-sm [&_h2]:font-bold [&_h3]:text-sm [&_h3]:font-semibold [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_hr]:my-2 [&_hr]:border-line [&_strong]:font-semibold">
+                    <Markdown>{result}</Markdown>
                   </div>
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                     <button

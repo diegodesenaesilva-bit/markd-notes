@@ -52,7 +52,7 @@ export function BacklinksSidebar({
     openSettings,
   } = useUi();
 
-  const visible = Boolean(rel && rightPanelOpen);
+  const visible = rightPanelOpen;
 
   return (
     <motion.div
@@ -139,7 +139,15 @@ export function BacklinksSidebar({
             <WritingAssistantSidebar isOpen={visible && rightPanelTab === "writing-assistant"} onClose={closeRightPanel} />
           </div>
           <div className={cx("absolute inset-0 flex flex-col", rightPanelTab !== "backlinks" && "hidden")}>
-            <LinkedMentions hideHeader rel={rel ?? ""} active={visible && rightPanelTab === "backlinks"} onClose={closeRightPanel} />
+            {rel ? (
+              <LinkedMentions hideHeader rel={rel} active={visible && rightPanelTab === "backlinks"} onClose={closeRightPanel} />
+            ) : (
+              <div className="flex flex-1 flex-col items-center justify-center p-6 text-center text-faint">
+                <Link2 size={32} className="mb-2 opacity-30 text-muted" />
+                <p className="text-xs font-semibold text-ink">Nenhuma nota ativa</p>
+                <p className="text-[11px] text-muted mt-1 max-w-[220px]">Abra uma nota para visualizar as menções e conexões entre arquivos.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
