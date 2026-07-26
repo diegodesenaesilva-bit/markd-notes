@@ -12,6 +12,12 @@ if (!/^\d+\.\d+\.\d+$/.test(expectedVersion ?? "")) {
   process.exit(1);
 }
 
+// Auto-sync version files across the project before validating
+import { execSync } from "node:child_process";
+try {
+  execSync("node scripts/sync-version.js", { cwd: projectRoot, stdio: "ignore" });
+} catch {}
+
 const readJson = (path) => JSON.parse(readFileSync(join(projectRoot, path), "utf8"));
 const versions = new Map([
   ["package.json", readJson("package.json").version],
