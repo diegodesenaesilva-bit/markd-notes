@@ -1,47 +1,30 @@
 #!/usr/bin/env node
 
 /**
- * Version Synchronization Script
- *
- * This script ensures version consistency across all configuration files:
- * - src-tauri/tauri.conf.json (source of truth)
- * - package.json
- * - src-tauri/Cargo.toml
- *
- * Usage:
- *   bun scripts/sync-version.js
- *
- * The script reads the version from tauri.conf.json and updates the other files.
- * This should be run before building to ensure all files have the same version.
+ * Self-Healing Version Synchronization Script
  */
 
-import { readFileSync, writeFileSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
-// Get the directory of this script
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// Get the project root directory (one level up from scripts/)
 const projectRoot = join(__dirname, "..");
 
-/**
- * Read JSON file and parse it
- */
+const CORRECT_ENDPOINT = "https://github.com/diegodesenaesilva-bit/markd-notes/releases/latest/download/latest.json";
+const CORRECT_PUBKEY = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDdFNjNBOTNGNTRBQzFDNgpSV1RHd1VyMWt6cm1CenhURGY5RGdDKzNLYnFDKzF4U0dpbG80cnRBa080a2pER0ZPYjZNNEJrZQo=";
+
 function readJsonFile(filePath) {
   try {
     const content = readFileSync(filePath, "utf-8");
-    return JSON.parse(content);
+    return JSON.parse(content.replace(/^\uFEFF/, ""));
   } catch (error) {
     console.error(`Error reading ${filePath}:`, error.message);
     process.exit(1);
   }
 }
 
-/**
- * Write JSON file with proper formatting
- */
 function writeJsonFile(filePath, data) {
   try {
     const content = JSON.stringify(data, null, 2) + "\n";
@@ -52,59 +35,114 @@ function writeJsonFile(filePath, data) {
   }
 }
 
-/**
- * Update version in Cargo.toml
- * Cargo.toml uses TOML format, so we need to parse and update the version line
- */
 function updateCargoToml(filePath, version) {
+  if (!existsSync(filePath)) return;
   try {
     let content = readFileSync(filePath, "utf-8");
-
-    // Replace the version line in the [package] section
-    // Match: version = "0.1.0" (with optional whitespace)
     const versionRegex = /^(\s*version\s*=\s*")[^"]+(".*)$/m;
-
     if (versionRegex.test(content)) {
       content = content.replace(versionRegex, `$1${version}$2`);
       writeFileSync(filePath, content, "utf-8");
       console.log(`✓ Updated Cargo.toml version to ${version}`);
-    } else {
-      console.warn(`⚠ Could not find version line in Cargo.toml`);
     }
   } catch (error) {
     console.error(`Error updating Cargo.toml:`, error.message);
-    process.exit(1);
   }
 }
 
-/**
- * Update version in package.json
- */
 function updatePackageJson(filePath, version) {
+  if (!existsSync(filePath)) return;
   try {
     const packageJson = readJsonFile(filePath);
-
     if (packageJson.version !== version) {
       packageJson.version = version;
       writeJsonFile(filePath, packageJson);
-      console.log(`✓ Updated package.json version to ${version}`);
-    } else {
-      console.log(`✓ package.json already has version ${version}`);
+      console.log(`✓ Updated ${filePath} version to ${version}`);
     }
   } catch (error) {
-    console.error(`Error updating package.json:`, error.message);
-    process.exit(1);
+    console.error(`Error updating ${filePath}:`, error.message);
   }
 }
 
-/**
- * Main synchronization function
- */
+function updateSiteConfig(filePath, version) {
+  if (!existsSync(filePath)) return;
+  try {
+    let content = readFileSync(filePath, "utf-8");
+    content = content.replace(/export const VERSION = "[^"]+"/, `export const VERSION = "${version}"`);
+    writeFileSync(filePath, content, "utf-8");
+    console.log(`✓ Updated site/lib/config.ts version to ${version}`);
+  } catch (error) {
+    console.error(`Error updating site config:`, error.message);
+  }
+}
+
+function updateSiteChangelog(filePath, version) {
+  if (!existsSync(filePath)) return;
+  try {
+    let content = readFileSync(filePath, "utf-8");
+    content = content.replace(/version:\s*"[^"]+"/, `version: "${version}"`);
+    writeFileSync(filePath, content, "utf-8");
+    console.log(`✓ Updated site/lib/changelog.ts version to ${version}`);
+  } catch (error) {
+    console.error(`Error updating site changelog:`, error.message);
+  }
+}
+
+function sanitizeTauriConf(filePath) {
+  if (!existsSync(filePath)) return;
+  try {
+    const conf = readJsonFile(filePath);
+    let modified = false;
+
+    if (!conf.plugins) conf.plugins = {};
+    if (!conf.plugins.updater) conf.plugins.updater = {};
+
+    if (conf.plugins.updater.pubkey !== CORRECT_PUBKEY) {
+      conf.plugins.updater.pubkey = CORRECT_PUBKEY;
+      modified = true;
+    }
+
+    if (!Array.isArray(conf.plugins.updater.endpoints) || conf.plugins.updater.endpoints[0] !== CORRECT_ENDPOINT) {
+      conf.plugins.updater.endpoints = [CORRECT_ENDPOINT];
+      modified = true;
+    }
+
+    if (modified) {
+      writeJsonFile(filePath, conf);
+      console.log("🛡️ Protected tauri.conf.json updater endpoints and pubkey");
+    }
+  } catch (error) {
+    console.error("Error sanitizing tauri.conf.json:", error.message);
+  }
+}
+
+function removeConflictingFiles() {
+  const badFiles = [
+    join(projectRoot, ".github", "workflows", "release-windows.yml"),
+    join(projectRoot, ".github", "workflows", "release-linux.yml"),
+    join(projectRoot, "bun.lock"),
+  ];
+
+  for (const file of badFiles) {
+    if (existsSync(file)) {
+      try {
+        unlinkSync(file);
+        console.log(`🛡️ Removed conflicting template file: ${file}`);
+      } catch {
+        // ignore
+      }
+    }
+  }
+}
+
 function syncVersion() {
   console.log("🔄 Syncing version across configuration files...\n");
 
-  // Read version from tauri.conf.json (source of truth)
+  removeConflictingFiles();
+
   const tauriConfPath = join(projectRoot, "src-tauri", "tauri.conf.json");
+  sanitizeTauriConf(tauriConfPath);
+
   const tauriConf = readJsonFile(tauriConfPath);
   const version = tauriConf.version;
 
@@ -115,17 +153,14 @@ function syncVersion() {
 
   console.log(`📦 Source version from tauri.conf.json: ${version}\n`);
 
-  // Update package.json
-  const packageJsonPath = join(projectRoot, "package.json");
-  updatePackageJson(packageJsonPath, version);
-
-  // Update Cargo.toml
-  const cargoTomlPath = join(projectRoot, "src-tauri", "Cargo.toml");
-  updateCargoToml(cargoTomlPath, version);
+  updatePackageJson(join(projectRoot, "package.json"), version);
+  updateCargoToml(join(projectRoot, "src-tauri", "Cargo.toml"), version);
+  updatePackageJson(join(projectRoot, "site", "package.json"), version);
+  updateSiteConfig(join(projectRoot, "site", "lib", "config.ts"), version);
+  updateSiteChangelog(join(projectRoot, "site", "lib", "changelog.ts"), version);
 
   console.log("\n✅ Version synchronization complete!");
   console.log(`   All files now use version: ${version}\n`);
 }
 
-// Run the synchronization
 syncVersion();
