@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -38,18 +36,56 @@ jobs:
       - name: Install frontend dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build Tauri Application
-        run: npx tauri build --target x86_64-pc-windows-msvc --no-sign
-
-      - name: Create latest.json manifest for Updater
-        run: node scripts/generate-manifest.cjs
-
-      - name: Get version tag from tauri.conf.json
+      - name: Get version from tauri.conf.json
         id: version
         shell: powershell
         run: |
           $ver = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          echo "version=$ver" >> $env:GITHUB_OUTPUT
           echo "tag=v$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Build and sign Tauri Application
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+        run: npx tauri build --target x86_64-pc-windows-msvc
+
+      - name: Collect updater artifacts and rename latest.json
+        shell: powershell
+        run: |
+          $ver = "${{ steps.version.outputs.version }}"
+          $tag = "${{ steps.version.outputs.tag }}"
+
+          # Find the .nsis.zip.sig file (Tauri's updater signature for Windows)
+          $sigFile = Get-ChildItem -Recurse -Filter "*.nsis.zip.sig" | Select-Object -First 1
+          if ($sigFile) {
+            $signature = Get-Content $sigFile.FullName -Raw
+            $signature = $signature.Trim()
+            Write-Host "Found signature: $signature"
+          } else {
+            Write-Host "WARNING: No .nsis.zip.sig file found"
+            $signature = ""
+          }
+
+          # Find the .nsis.zip file URL
+          $zipUrl = "https://github.com/diegodesenaesilva-bit/markd-notes/releases/download/$tag/Markd_${ver}_x64-setup.nsis.zip"
+
+          # Build latest.json
+          $manifest = @{
+            version = $tag
+            notes = "Markd $tag"
+            pub_date = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+            platforms = @{
+              "windows-x86_64" = @{
+                signature = $signature
+                url = $zipUrl
+              }
+            }
+          }
+
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path latest.json -Encoding UTF8NoBOM
+          Write-Host "Generated latest.json:"
+          Get-Content latest.json
 
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
@@ -58,6 +94,8 @@ jobs:
           name: Markd ${{ steps.version.outputs.tag }}
           files: |
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.nsis.zip.sig
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
             latest.json
           draft: false
