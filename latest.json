@@ -1,11 +1,11 @@
 {
-  "version": "v0.1.7",
-  "notes": "Markd v0.1.7",
-  "pub_date": "2026-07-26T16:36:46.281Z",
+  "version": "v0.2.0",
+  "notes": "Markd v0.2.0",
+  "pub_date": "2026-07-26T17:01:07.166Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "",
-      "url": "https://github.com/diegodesenaesilva-bit/markd-notes/releases/download/v0.1.7/Markd_0.1.7_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSTHZsc0w0WGg5cTJTT0dLVUQ4blhBNG05cFBwM29GVVVSMStvMGxBK2NoRm95cHczV3FHdjh0blVZUUxaWHVWaU5NWkNYZGlvRXo4NDhEUk4rRDFwclBUa3dvWDdzSXcwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg1MDg1MjY3CWZpbGU6TWFya2RfMC4yLjBfeDY0LXNldHVwLmV4ZQplMnE4Vm9zVUNKazBGQlJTVHl1QTNpQXNVZWhFTndCenBTTjJibWZyS2NxMm82NUlMYUhWS2dlQ0MvSDYvN0JjcDY2b0lhcWE1eUNUSWh0UDlTOUVEQT09Cg==",
+      "url": "https://github.com/diegodesenaesilva-bit/markd-notes/releases/download/v0.2.0/Markd_0.2.0_x64-setup.exe"
     }
   }
 }
