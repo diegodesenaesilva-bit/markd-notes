@@ -2,6 +2,8 @@ name: Release Markd Notes
 
 on:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -42,9 +44,18 @@ jobs:
       - name: Create latest.json manifest for Updater
         run: node scripts/generate-manifest.cjs
 
+      - name: Get version tag from tauri.conf.json
+        id: version
+        shell: powershell
+        run: |
+          $ver = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          echo "tag=v$ver" >> $env:GITHUB_OUTPUT
+
       - name: Publish Release to GitHub
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Markd ${{ steps.version.outputs.tag }}
           files: |
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
             src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi

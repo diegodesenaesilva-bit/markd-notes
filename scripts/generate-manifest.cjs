@@ -2,8 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const cp = require('child_process');
 
-const tag = process.env.GITHUB_REF_NAME || 'v0.2.5';
-const ver = tag.replace(/^v/, '');
+const tauriConf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8').replace(/^\uFEFF/, ''));
+const ver = tauriConf.version;
+const tag = `v${ver}`;
 
 // Find actual built setup exe path
 let setupExePath = `src-tauri/target/release/bundle/nsis/Markd_${ver}_x64-setup.exe`;
