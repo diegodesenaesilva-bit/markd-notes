@@ -1,0 +1,53 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.md
+!README.md
+!AGENTS.md
+!CLAUDE.md
+!CONTRIBUTING.md
+!brand.md
+!NOTARIZATION.md
+
+# Secrets and keys (never commit these!)
+*.key
+*.p8
+*.p12
+.env
+.env.local
+*.keystore
+
+# macOS code signing (private keys)
+AuthKey_*.p8
+*.mobileprovision
+
+.claude
+
+# Internal design/research notes — not shipped
+/docs/
+
+# Windows executables and installers (build artifacts — too large for git)
+*.exe
+*.msi
+src-tauri/target/

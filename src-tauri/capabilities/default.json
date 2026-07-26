@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Capability for the main window and Qwen Chat window",
+  "windows": ["main", "quick-capture", "qwen-chat-window"],
+  "permissions": [
+    "core:default",
+    "core:window:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
+    "core:window:allow-create",
+    "core:webview:default",
+    "core:window:allow-start-dragging",
+    "opener:default",
+    "opener:allow-open-url",
+    "dialog:default",
+    "process:default",
+    "process:allow-restart",
+    "updater:default"
+  ]
+}

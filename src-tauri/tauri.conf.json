@@ -1,0 +1,113 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Markd",
+  "version": "0.1.6",
+  "identifier": "app.usemarkd",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Markd",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "maximized": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "decorations": false,
+        "transparent": false
+      },
+      {
+        "label": "quick-capture",
+        "title": "Quick Capture",
+        "width": 500,
+        "height": 356,
+        "minWidth": 500,
+        "minHeight": 356,
+        "maxWidth": 500,
+        "maxHeight": 356,
+        "center": true,
+        "visible": false,
+        "focus": false,
+        "resizable": false,
+        "maximizable": false,
+        "minimizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "visibleOnAllWorkspaces": true,
+        "skipTaskbar": true,
+        "shadow": true
+      },
+      {
+        "label": "qwen-chat-window",
+        "title": "Qwen Chat (Oficial)",
+        "url": "https://chat.qwen.ai/",
+        "width": 560,
+        "height": 780,
+        "center": true,
+        "visible": false,
+        "resizable": true,
+        "alwaysOnTop": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' https:; connect-src ipc: http://ipc.localhost http://localhost:11434 http://127.0.0.1:11434 https://api.usemarkd.app https://chat.qwen.ai https://*.qwen.ai https://*.aliyun.com https://*.alibabacloud.com; frame-src 'self' https://chat.qwen.ai https://*.qwen.ai https://*.aliyun.com https://*.alibabacloud.com; font-src 'self' data: https:; img-src 'self' asset: http://asset.localhost data: https:; style-src 'self' 'unsafe-inline'",
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "bundle": {
+    "createUpdaterArtifacts": true,
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/256x256.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "category": "Productivity",
+    "shortDescription": "A fast, local-first Markdown notes app",
+    "longDescription": "Markd is a local-first Markdown notes app built for speed, privacy, and data ownership.",
+    "macOS": {
+      "entitlements": "./Entitlements.plist",
+      "dmg": {
+        "windowSize": {
+          "width": 660,
+          "height": 400
+        },
+        "windowPosition": {
+          "x": 400,
+          "y": 400
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 220
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 220
+        }
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": ["https://usemarkd.app/updates/latest.json"],
+      "dialog": false,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI1NTc1QTg3M0ZEMEZCRTMKUldUais5QS9oMXBYdGRxUWpRYW1IZ0hCbGxhbVdObjkyRVh5NVhWYTZEanVYbUVlaGRrb3hKQ2cK"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Markd",
+  "description": "Local-first markdown notes app with Tiptap editor, backlinks, todos, and bookmarks.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

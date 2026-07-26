@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Markd</title>
+    <script>
+      if (typeof window !== "undefined" && !window.__TAURI_INTERNALS__) {
+        window.__TAURI_IS_WEB__ = true;
+        window.__TAURI_INTERNALS__ = {
+          metadata: {
+            currentWindow: { label: "main" },
+            webviews: []
+          },
+          invoke: async function() {},
+          transformCallback: function(cb) { return cb; }
+        };
+      }
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
