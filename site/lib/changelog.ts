@@ -10,7 +10,7 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "0.2.9",
+    version: "0.1.6",
     date: "2026-07-21",
     displayDate: "July 21, 2026",
     title: "Publish and stay in control",

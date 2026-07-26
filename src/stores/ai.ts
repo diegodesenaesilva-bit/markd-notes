@@ -48,7 +48,7 @@ export const useAiStore = create<AiState>()(
       qwenApiKey: "",
       ollamaCloudApiKey: "",
 
-      geminiModel: "gemini-3.6-flash",
+      geminiModel: "gemini-2.5-flash",
       groqModel: "llama-3.3-70b-versatile",
       openaiModel: "gpt-4o-mini",
       claudeModel: "claude-3-5-sonnet-20241022",

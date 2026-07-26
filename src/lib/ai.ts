@@ -188,7 +188,7 @@ async function chatWithGemini(
 ): Promise<string> {
   const lastUserMsg = messages[messages.length - 1]?.text || "";
 
-  // Try server-side Gemini API route first
+  // 1. Try server-side Gemini API route first (for web mode)
   try {
     const res = await fetch("/api/gemini/generate", {
       method: "POST",
@@ -204,15 +204,29 @@ async function chatWithGemini(
       const data = await res.json();
       if (data.text) return data.text;
     }
-  } catch (err) {
-    // If server route fails, continue to client fallback
+  } catch {
+    // Expected on standalone desktop Tauri app
   }
 
-  if (!apiKey.trim()) {
-    throw new Error("Chave da API do Google Gemini não configurada. Configure em Settings -> General.");
+  // 2. Resolve API Key: user personal key -> environment variable
+  const effectiveKey =
+    apiKey.trim() ||
+    (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_GEMINI_API_KEY) ||
+    "";
+
+  if (!effectiveKey) {
+    throw new Error(
+      "Chave da API do Google Gemini não encontrada. No aplicativo local para Windows, por favor insira sua chave do Google AI Studio em Configurações -> Geral -> Chave de API Pessoal."
+    );
   }
 
-  const systemPrompt = "Você é o Mark, assistente de IA no Markd. Responda em Português.";
+  // 3. Map model name to valid Google Generative Language REST API model
+  let targetModel = (model || "gemini-2.5-flash").trim();
+  if (targetModel.includes("3.6") || targetModel === "gemini-3.6-flash") {
+    targetModel = "gemini-2.5-flash";
+  }
+
+  const systemPrompt = "Você é o Mark, assistente de IA no Markd. Responda em Português do Brasil.";
   const fullPrompt = `${systemPrompt}\n\n${contextHeader}Solicitação: ${lastUserMsg}`;
 
   const contents = messages.map((m) => ({
@@ -220,16 +234,18 @@ async function chatWithGemini(
     parts: [{ text: m === messages[messages.length - 1] ? fullPrompt : m.text }],
   }));
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-3.6-flash"}:generateContent?key=${apiKey.trim()}`,
-    {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${effectiveKey}`;
+
+  let res: Response;
+  try {
+    res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ contents }),
-    }
-  ).catch((err) => {
-    throw new Error(`Falha de rede ao conectar à API do Google Gemini: ${err.message}`);
-  });
+    });
+  } catch (err: any) {
+    throw new Error(`Falha de rede ao conectar à API do Google Gemini: ${err.message || "Erro de conexão"}`);
+  }
 
   const textPayload = await res.text();
   let data: any = {};
@@ -240,10 +256,16 @@ async function chatWithGemini(
   }
 
   if (!res.ok) {
-    throw new Error(`Erro no Google Gemini (HTTP ${res.status}): ${data.error?.message || data.rawText}`);
+    const errorDetail = data.error?.message || data.rawText || `Status HTTP ${res.status}`;
+    throw new Error(`Erro no Google Gemini (HTTP ${res.status}): ${errorDetail}`);
   }
 
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "Sem resposta do Gemini.";
+  const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!resultText) {
+    throw new Error("O Google Gemini não retornou nenhum texto de resposta.");
+  }
+
+  return resultText;
 }
 
 /**

@@ -37,14 +37,15 @@ export function WindowControls() {
     }
   }, []);
 
-  const handleMinimize = (e: React.SyntheticEvent) => {
+  const handleMinimize = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (isTauri()) {
       try {
-        void getCurrentWindow().minimize();
-      } catch {
-        // Fallback
+        const appWindow = getCurrentWindow();
+        await appWindow.minimize();
+      } catch (err) {
+        console.error("Erro ao minimizar janela do Tauri:", err);
       }
     } else {
       setIsWebMinimized(true);
@@ -62,8 +63,8 @@ export function WindowControls() {
         const appWindow = getCurrentWindow();
         await appWindow.toggleMaximize();
         setIsMaximized(await appWindow.isMaximized());
-      } catch {
-        // Fallback
+      } catch (err) {
+        console.error("Erro ao maximizar/restaurar janela do Tauri:", err);
       }
     } else {
       try {
@@ -87,14 +88,15 @@ export function WindowControls() {
     }
   };
 
-  const handleClose = (e: React.SyntheticEvent) => {
+  const handleClose = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (isTauri()) {
       try {
-        void getCurrentWindow().close();
-      } catch {
-        // Fallback
+        const appWindow = getCurrentWindow();
+        await appWindow.close();
+      } catch (err) {
+        console.error("Erro ao fechar janela do Tauri:", err);
       }
     } else {
       try {

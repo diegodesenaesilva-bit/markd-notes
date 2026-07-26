@@ -54,7 +54,6 @@ const THEMES: Array<{
 
 import { useAiStore } from "@/stores/ai";
 import { testOnlineAiConnection } from "@/lib/ai";
-import { version as appVersion } from "../../../package.json";
 
 export function GeneralSettings() {
   const root = useVault((state) => state.root);
@@ -111,7 +110,7 @@ export function GeneralSettings() {
         ? "Installing…"
         : updateStatus === "checking"
           ? "Checking for updates…"
-          : `You're on version ${updateVersion || appVersion}`;
+          : `You're on version ${updateVersion || "0.1.6"}`;
 
   return (
     <div className="space-y-6">
@@ -127,7 +126,7 @@ export function GeneralSettings() {
                 <span className="text-base">🌐</span>
                 <div>
                   <h4 className="text-xs font-semibold text-blue-600 dark:text-blue-400">
-                    Google Gemini 3.6 Flash (Nativo &amp; Rápido)
+                    Google Gemini IA (Assistente Integrado)
                   </h4>
                   <p className="text-[11px] text-faint">
                     IA oficial do aplicativo para resumir, continuar e analisar suas notas.
@@ -135,36 +134,36 @@ export function GeneralSettings() {
                 </div>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
-                ✓ Conectado ao Servidor
+                ✓ Pronto para Uso
               </span>
             </div>
 
             <p className="text-[11.5px] text-muted leading-relaxed pt-1">
-              <strong>Como funciona a Chave de API:</strong> A chave de API do Gemini já vem configurada no servidor backend do aplicativo via variável de ambiente (<code className="rounded bg-bg px-1 py-0.5 font-mono text-[10px]">GEMINI_API_KEY</code>). Você não precisa digitar nada para o assistente funcionar perfeitamente!
+              <strong>Instrução para uso no Windows Local:</strong> No aplicativo desktop local, informe sua chave de API pessoal do Google AI Studio no campo abaixo para habilitar o assistente. A chave é 100% gratuita.
             </p>
           </div>
 
           <div className="pt-1 space-y-3 border-t border-line/50">
             <div className="flex flex-col gap-1.5">
               <label className="text-[12px] font-medium text-muted">
-                Chave de API Pessoal (Opcional):
+                Chave de API do Google AI Studio (Cole aqui):
               </label>
               <input
                 type="password"
                 value={geminiApiKey}
                 onChange={(e) => setGeminiApiKey(e.target.value)}
-                placeholder="Cole sua API Key do Google AI Studio se desejar usar sua própria conta (AIzaSy...)"
+                placeholder="Cole sua API Key aqui (ex: AIzaSy...)"
                 className="w-full rounded-lg border border-line bg-bg px-3 py-1.5 text-xs text-ink outline-none focus:border-blue-500 placeholder:text-faint"
               />
               <p className="text-[11px] text-faint">
-                Se deixar em branco, o sistema usará automaticamente a chave nativa do servidor. Obtenha uma chave no{" "}
+                Obtenha gratuitamente sua chave de API no{" "}
                 <a
                   href="https://aistudio.google.com/"
                   target="_blank"
                   rel="noreferrer"
                   className="text-blue-500 underline"
                 >
-                  Google AI Studio
+                  Google AI Studio (aistudio.google.com)
                 </a>.
               </p>
             </div>
@@ -176,7 +175,9 @@ export function GeneralSettings() {
                 onChange={(e) => setGeminiModel(e.target.value)}
                 className="rounded-lg border border-line bg-bg px-3 py-1.5 text-xs text-ink outline-none focus:border-blue-500"
               >
-                <option value="gemini-3.6-flash">Gemini 3.6 Flash (Recomendado - Mais Recente &amp; Rápido)</option>
+                <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recomendado - Mais Recente &amp; Rápido)</option>
+                <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                 <option value="gemini-1.5-pro">Gemini 1.5 Pro (Mais Inteligente)</option>
               </select>
             </div>
