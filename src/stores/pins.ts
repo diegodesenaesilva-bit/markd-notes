@@ -8,6 +8,7 @@ interface PinsState {
   load: () => Promise<void>;
   pin: (rel: string) => Promise<void>;
   unpin: (rel: string) => Promise<void>;
+  reorder: (fromIndex: number, toIndex: number) => Promise<void>;
   toggle: (rel: string) => Promise<void>;
   clear: () => void;
 }
@@ -41,6 +42,19 @@ export const usePins = create<PinsState>((set, get) => ({
   unpin: async (rel) => {
     try {
       set({ pins: await ipc.unpinNote(rel) });
+    } catch (error) {
+      showError(error);
+    }
+  },
+
+  reorder: async (fromIndex, toIndex) => {
+    const pins = [...get().pins];
+    if (fromIndex < 0 || fromIndex >= pins.length || toIndex < 0 || toIndex >= pins.length) return;
+    const [removed] = pins.splice(fromIndex, 1);
+    pins.splice(toIndex, 0, removed);
+    set({ pins });
+    try {
+      set({ pins: await ipc.pinsSave(pins) });
     } catch (error) {
       showError(error);
     }

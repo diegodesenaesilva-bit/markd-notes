@@ -29,7 +29,6 @@ import { useUi } from "@/stores/ui";
 import { useUpdater } from "@/stores/updater";
 import { activeDir, useVault } from "@/stores/vault";
 import { TrashModal } from "@/components/trash/TrashModal";
-import { useTrash } from "@/stores/trash";
 import { toast } from "sonner";
 
 type NavKey = "calendar" | "todos" | "bookmarks" | "canvas";
@@ -105,10 +104,13 @@ export function Sidebar() {
   const createCanvas = useCanvas((s) => s.createCanvas);
   const renameCanvas = useCanvas((s) => s.renameCanvas);
   const deleteCanvas = useCanvas((s) => s.deleteCanvas);
+  const reorderCanvas = useCanvas((s) => s.reorderCanvas);
 
   const [navOrder, setNavOrder] = useState<NavKey[]>(getStoredNavOrder);
   const [draggedKey, setDraggedKey] = useState<NavKey | null>(null);
   const [dragOverKey, setDragOverKey] = useState<NavKey | null>(null);
+  const [draggedCanvasId, setDraggedCanvasId] = useState<string | null>(null);
+  const [dragOverCanvasId, setDragOverCanvasId] = useState<string | null>(null);
   const [canvasExpanded, setCanvasExpanded] = useState(true);
   const [editingCanvasId, setEditingCanvasId] = useState<string | null>(null);
   const [editingCanvasName, setEditingCanvasName] = useState("");
@@ -117,7 +119,6 @@ export function Sidebar() {
     meta: { id: string; name: string };
   } | null>(null);
   const [trashOpen, setTrashOpen] = useState(false);
-  const trashCount = useTrash((s) => s.items.length);
 
   useEffect(() => {
     void loadCanvasList();
@@ -136,6 +137,17 @@ export function Sidebar() {
     localStorage.setItem("markd_nav_order", JSON.stringify(newOrder));
     setDraggedKey(null);
     setDragOverKey(null);
+  };
+
+  const handleCanvasDrop = (targetId: string) => {
+    if (!draggedCanvasId || draggedCanvasId === targetId) return;
+    const fromIndex = canvasList.findIndex((c) => c.id === draggedCanvasId);
+    const toIndex = canvasList.findIndex((c) => c.id === targetId);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    void reorderCanvas(fromIndex, toIndex);
+    setDraggedCanvasId(null);
+    setDragOverCanvasId(null);
   };
 
   const openNavTab = (key: NavKey, canvasId?: string) => {
@@ -260,6 +272,25 @@ export function Sidebar() {
                     return (
                       <div
                         key={meta.id}
+                        draggable={!isEditing}
+                        onDragStart={(e) => {
+                          e.stopPropagation();
+                          setDraggedCanvasId(meta.id);
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          e.dataTransfer.dropEffect = "move";
+                          setDragOverCanvasId(meta.id);
+                        }}
+                        onDragLeave={(e) => {
+                          e.stopPropagation();
+                          setDragOverCanvasId(null);
+                        }}
+                        onDrop={(e) => {
+                          e.stopPropagation();
+                          handleCanvasDrop(meta.id);
+                        }}
                         onClick={() => {
                           if (!isEditing) openNavTab("canvas", meta.id);
                         }}
@@ -277,10 +308,13 @@ export function Sidebar() {
                           });
                         }}
                         className={cx(
-                          "group/canvas flex h-6.5 items-center justify-between rounded-md px-2 text-[12px] cursor-pointer select-none transition-colors",
+                          "group/canvas flex h-6.5 items-center justify-between rounded-md px-2 text-[12px] select-none transition-all",
+                          !isEditing ? "cursor-grab active:cursor-grabbing" : "cursor-default",
                           isMetaActive
                             ? "bg-active font-medium text-ink"
                             : "text-muted hover:bg-hover hover:text-ink",
+                          draggedCanvasId === meta.id && "opacity-30 border border-dashed border-line",
+                          dragOverCanvasId === meta.id && "ring-2 ring-primary/60 bg-hover scale-[1.01]",
                         )}
                       >
                         {isEditing ? (
@@ -326,7 +360,6 @@ export function Sidebar() {
                                     e.stopPropagation();
                                     e.preventDefault();
                                     void deleteCanvas(meta.id);
-                                    toast.success(`Moodboard "${meta.name}" movido para a lixeira`);
                                   }}
                                   className="p-0.5 text-faint hover:text-rose-500 rounded"
                                 >
@@ -394,11 +427,6 @@ export function Sidebar() {
             className="relative grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md text-muted transition-colors duration-100 hover:bg-hover hover:text-rose-500"
           >
             <Trash2 size={15} strokeWidth={1.75} />
-            {trashCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">
-                {trashCount}
-              </span>
-            )}
           </button>
         </Tooltip>
       </div>
@@ -436,9 +464,7 @@ export function Sidebar() {
                     icon: Trash2,
                     danger: true,
                     onSelect: () => {
-                      const name = canvasMenu.meta.name;
                       void deleteCanvas(canvasMenu.meta.id);
-                      toast.success(`Moodboard "${name}" movido para a lixeira`);
                     },
                   },
                 ]
@@ -545,26 +571,26 @@ function PageLink({
       onDragOver={onDragOver}
       onDragLeave={onDragLeave}
       onDrop={onDrop}
+      onClick={onClick}
       className={cx(
-        "group relative flex h-[34px] w-full items-center justify-between rounded-lg px-2.5 text-[13.5px] transition-colors duration-100 select-none",
+        "group relative flex h-[34px] w-full items-center justify-between rounded-lg px-2.5 text-[13.5px] cursor-grab active:cursor-grabbing transition-all duration-100 select-none",
         active
           ? "bg-hover font-medium text-ink"
           : "text-muted hover:bg-hover hover:text-ink",
-        isDragging && "opacity-40",
-        isDragOver && "ring-1 ring-sky-500 bg-hover",
+        isDragging && "opacity-30 border border-dashed border-line",
+        isDragOver && "ring-2 ring-primary/60 bg-hover scale-[1.01]",
       )}
     >
-      <button
-        type="button"
-        aria-current={active ? "page" : undefined}
-        onClick={onClick}
-        className="flex flex-1 items-center gap-3 text-left outline-none min-w-0"
-      >
+      <div className="flex flex-1 items-center gap-3 text-left outline-none min-w-0 pointer-events-none">
         <span className="shrink-0 text-muted group-hover:text-ink transition-colors">{icon}</span>
         <span className="truncate">{label}</span>
-      </button>
+      </div>
 
-      {extraAction}
+      {extraAction && (
+        <div className="pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+          {extraAction}
+        </div>
+      )}
     </div>
   );
 }

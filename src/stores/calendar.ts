@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { toast } from "sonner";
+import { parseIcalData } from "@/lib/ical";
 
 export interface CalendarEvent {
   id: string;
@@ -20,6 +21,8 @@ interface CalendarState {
   visibleCategories: Set<string>;
   googleConnected: boolean;
   googleEmail: string | null;
+  googleIcalUrl: string | null;
+  syncingGoogle: boolean;
   selectedDate: string; // YYYY-MM-DD
   viewMode: "day" | "week" | "month";
   
@@ -29,12 +32,14 @@ interface CalendarState {
   addEvent: (event: Omit<CalendarEvent, "id">) => void;
   updateEvent: (id: string, event: Partial<CalendarEvent>) => void;
   deleteEvent: (id: string) => void;
-  connectGoogle: (email?: string) => void;
+  syncIcalUrl: (url: string, email?: string) => Promise<boolean>;
+  syncIcalContent: (content: string, email?: string) => boolean;
   disconnectGoogle: () => void;
 }
 
 const STORAGE_KEY = "markd_calendar_events";
 const GOOGLE_KEY = "markd_google_calendar_account";
+const GOOGLE_URL_KEY = "markd_google_calendar_ical_url";
 
 function getTodayStr(offsetDays = 0): string {
   const d = new Date();
@@ -110,11 +115,14 @@ function loadEventsFromStorage(): CalendarEvent[] {
   return INITIAL_EVENTS;
 }
 
-function loadGoogleAccount(): string | null {
+function loadGoogleAccount(): { email: string | null; url: string | null } {
   try {
-    return localStorage.getItem(GOOGLE_KEY) || null;
+    return {
+      email: localStorage.getItem(GOOGLE_KEY) || null,
+      url: localStorage.getItem(GOOGLE_URL_KEY) || null,
+    };
   } catch {
-    return null;
+    return { email: null, url: null };
   }
 }
 
@@ -124,8 +132,10 @@ export const useCalendar = create<CalendarState>((set, get) => {
   return {
     events: loadEventsFromStorage(),
     visibleCategories: new Set(["event", "task", "birthday", "holiday", "google"]),
-    googleConnected: !!initialGoogle,
-    googleEmail: initialGoogle,
+    googleConnected: !!(initialGoogle.email || initialGoogle.url),
+    googleEmail: initialGoogle.email,
+    googleIcalUrl: initialGoogle.url,
+    syncingGoogle: false,
     selectedDate: getTodayStr(0),
     viewMode: "day",
 
@@ -179,58 +189,98 @@ export const useCalendar = create<CalendarState>((set, get) => {
       toast.success("Evento removido");
     },
 
-    connectGoogle: (email = "d.sena@vicunha.com") => {
-      const sampleGoogleEvents: CalendarEvent[] = [
-        {
-          id: "google-1",
-          title: "Sincronização Diária Google Calendar",
-          date: getTodayStr(0),
-          startTime: "11:30",
-          endTime: "12:00",
-          category: "google",
-          color: "#3b82f6", // blue
-          location: "Google Meet",
-          description: "Sincronizado diretamente do Google Calendar",
-          isGoogle: true
-        },
-        {
-          id: "google-2",
-          title: "Reunião de Diretoria",
-          date: getTodayStr(1),
-          startTime: "14:00",
-          endTime: "15:30",
+    syncIcalUrl: async (url, email) => {
+      set({ syncingGoogle: true });
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Status HTTP ${res.status}`);
+        const text = await res.text();
+        const parsed = parseIcalData(text);
+
+        const googleEvents: CalendarEvent[] = parsed.map((item) => ({
+          id: "google-" + item.id,
+          title: item.title,
+          date: item.date,
+          startTime: item.startTime,
+          endTime: item.endTime,
           category: "google",
           color: "#3b82f6",
-          location: "Auditório Principal",
-          description: "Sincronizado do Google Calendar",
-          isGoogle: true
+          location: item.location,
+          description: item.description,
+          isGoogle: true,
+        }));
+
+        set({
+          googleConnected: true,
+          googleEmail: email || "Google Agenda (iCal)",
+          googleIcalUrl: url,
+          events: [...get().events.filter((e) => !e.isGoogle), ...googleEvents],
+          syncingGoogle: false,
+        });
+
+        try {
+          localStorage.setItem(GOOGLE_KEY, email || "Google Agenda (iCal)");
+          localStorage.setItem(GOOGLE_URL_KEY, url);
+        } catch {
+          // ignore
         }
-      ];
 
-      set({
-        googleConnected: true,
-        googleEmail: email,
-        events: [...get().events.filter((e) => !e.isGoogle), ...sampleGoogleEvents]
-      });
-
-      try {
-        localStorage.setItem(GOOGLE_KEY, email);
-      } catch {
-        // ignore
+        toast.success(`Sincronizados ${googleEvents.length} eventos reais do Google Agenda!`);
+        return true;
+      } catch (err: any) {
+        set({ syncingGoogle: false });
+        toast.error(`Erro ao buscar feed do Google Agenda: ${err.message || "Erro de rede"}`);
+        return false;
       }
+    },
 
-      toast.success(`Google Agenda conectado (${email})`);
+    syncIcalContent: (content, email) => {
+      try {
+        const parsed = parseIcalData(content);
+        const googleEvents: CalendarEvent[] = parsed.map((item) => ({
+          id: "google-" + item.id,
+          title: item.title,
+          date: item.date,
+          startTime: item.startTime,
+          endTime: item.endTime,
+          category: "google",
+          color: "#3b82f6",
+          location: item.location,
+          description: item.description,
+          isGoogle: true,
+        }));
+
+        set({
+          googleConnected: true,
+          googleEmail: email || "Arquivo .ics do Google Agenda",
+          events: [...get().events.filter((e) => !e.isGoogle), ...googleEvents],
+        });
+
+        try {
+          localStorage.setItem(GOOGLE_KEY, email || "Arquivo .ics do Google Agenda");
+        } catch {
+          // ignore
+        }
+
+        toast.success(`Importados ${googleEvents.length} eventos reais do Google Agenda!`);
+        return true;
+      } catch (err: any) {
+        toast.error(`Erro ao processar arquivo .ics: ${err.message || "Formato inválido"}`);
+        return false;
+      }
     },
 
     disconnectGoogle: () => {
       set({
         googleConnected: false,
         googleEmail: null,
+        googleIcalUrl: null,
         events: get().events.filter((e) => !e.isGoogle)
       });
 
       try {
         localStorage.removeItem(GOOGLE_KEY);
+        localStorage.removeItem(GOOGLE_URL_KEY);
       } catch {
         // ignore
       }
@@ -239,3 +289,4 @@ export const useCalendar = create<CalendarState>((set, get) => {
     }
   };
 });
+

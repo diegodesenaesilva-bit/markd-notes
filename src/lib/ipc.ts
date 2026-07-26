@@ -470,6 +470,10 @@ const webHandlers: Record<string, (args?: any) => any> = {
     setStorage("markd_web_pins", pins);
     return pins;
   },
+  pins_save: (args: { pins: string[] }): string[] => {
+    setStorage("markd_web_pins", args.pins);
+    return args.pins;
+  },
 
   todos_list: (): Todo[] => getStorage<Todo[]>("markd_web_todos", SEED_TODOS),
   todo_add: (args: { text: string }): Todo => {
@@ -734,6 +738,7 @@ export const ipc = {
   pinsList: () => call<string[]>("pins_list"),
   pinNote: (rel: string) => call<string[]>("pin_note", { rel }),
   unpinNote: (rel: string) => call<string[]>("unpin_note", { rel }),
+  pinsSave: (pins: string[]) => call<string[]>("pins_save", { pins }),
 
   todosList: () => call<Todo[]>("todos_list"),
   todoAdd: (text: string) => call<Todo>("todo_add", { text }),

@@ -31,8 +31,6 @@ import { EASE_OUT } from "@/lib/ease";
 import { cx, parentDir } from "@/lib/utils";
 import { useVault } from "@/stores/vault";
 import { usePins } from "@/stores/pins";
-import { useTrash } from "@/stores/trash";
-import { toast } from "sonner";
 import { RenameInput } from "./RenameInput";
 import { entryMenuItems } from "./treeMenu";
 import {
@@ -422,19 +420,7 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                const displayName = isFolder ? node.name : node.name.replace(/\.md$/i, "");
                 void deleteEntry(node.rel);
-                toast.success(`"${displayName}" movido para a lixeira`, {
-                  action: {
-                    label: "Desfazer",
-                    onClick: () => {
-                      const items = useTrash.getState().items;
-                      if (items.length > 0) {
-                        void useTrash.getState().restoreItem(items[0].id);
-                      }
-                    },
-                  },
-                });
               }}
               className="p-1 text-faint hover:text-rose-500 rounded transition-colors"
             >

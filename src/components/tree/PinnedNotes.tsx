@@ -10,8 +10,6 @@ import type { TreeNode } from "@/lib/types";
 import { cx } from "@/lib/utils";
 import { usePins } from "@/stores/pins";
 import { useVault } from "@/stores/vault";
-import { useTrash } from "@/stores/trash";
-import { toast } from "sonner";
 import { RenameInput } from "./RenameInput";
 import { FolderMorphIcon } from "./FolderMorphIcon";
 import { entryMenuItems } from "./treeMenu";
@@ -27,12 +25,26 @@ export function PinnedNotes() {
   const tree = useVault((state) => state.tree);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [menu, setMenu] = useState<PinnedMenu | null>(null);
+  const [draggedRel, setDraggedRel] = useState<string | null>(null);
+  const [dragOverRel, setDragOverRel] = useState<string | null>(null);
+
   const nodes = useMemo(
     () => pins.map((rel) => findNode(tree, rel)).filter(isTreeNode),
     [pins, tree],
   );
 
   if (nodes.length === 0) return null;
+
+  const handleDrop = (targetRel: string) => {
+    if (!draggedRel || draggedRel === targetRel) return;
+    const fromIndex = pins.indexOf(draggedRel);
+    const toIndex = pins.indexOf(targetRel);
+    if (fromIndex === -1 || toIndex === -1) return;
+
+    void usePins.getState().reorder(fromIndex, toIndex);
+    setDraggedRel(null);
+    setDragOverRel(null);
+  };
 
   return (
     <section className="px-2 pb-1">
@@ -55,6 +67,16 @@ export function PinnedNotes() {
             root
             renaming={renaming}
             setRenaming={setRenaming}
+            isDragging={draggedRel === node.rel}
+            isDragOver={dragOverRel === node.rel}
+            onDragStart={() => setDraggedRel(node.rel)}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              setDragOverRel(node.rel);
+            }}
+            onDragLeave={() => setDragOverRel(null)}
+            onDrop={() => handleDrop(node.rel)}
             openMenu={(position, selected, root) =>
               setMenu({ position, node: selected, root })
             }
@@ -84,6 +106,12 @@ function PinnedRow({
   root,
   renaming,
   setRenaming,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
   openMenu,
 }: {
   node: TreeNode;
@@ -91,6 +119,12 @@ function PinnedRow({
   root: boolean;
   renaming: string | null;
   setRenaming: (rel: string | null) => void;
+  isDragging?: boolean;
+  isDragOver?: boolean;
+  onDragStart?: () => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragLeave?: () => void;
+  onDrop?: () => void;
   openMenu: (position: MenuPosition, node: TreeNode, root: boolean) => void;
 }) {
   const view = useVault((state) => state.view);
@@ -117,11 +151,19 @@ function PinnedRow({
         aria-expanded={isFolder ? isOpen : undefined}
         tabIndex={0}
         data-rel={node.rel}
+        draggable={root && !isRenaming}
+        onDragStart={root ? onDragStart : undefined}
+        onDragOver={root ? onDragOver : undefined}
+        onDragLeave={root ? onDragLeave : undefined}
+        onDrop={root ? onDrop : undefined}
         className={cx(
-          "group flex h-[30px] cursor-pointer items-center rounded-md pr-1.5 text-[13px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink",
+          "group flex h-[30px] items-center rounded-md pr-1.5 text-[13px] transition-all duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink select-none",
+          root && !isRenaming ? "cursor-grab active:cursor-grabbing" : "cursor-pointer",
           isActive
-            ? "bg-active text-ink"
+            ? "bg-active text-ink font-medium"
             : "text-muted hover:bg-hover hover:text-ink",
+          isDragging && "opacity-30 border border-dashed border-line",
+          isDragOver && "ring-2 ring-primary/60 bg-hover scale-[1.01]",
         )}
         style={{ paddingLeft: 16 + depth * 14 }}
         onClick={activate}
@@ -237,19 +279,7 @@ function PinnedRow({
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                const displayName = isFolder ? node.name : node.name.replace(/\.md$/i, "");
                 void deleteEntry(node.rel);
-                toast.success(`"${displayName}" movido para a lixeira`, {
-                  action: {
-                    label: "Desfazer",
-                    onClick: () => {
-                      const items = useTrash.getState().items;
-                      if (items.length > 0) {
-                        void useTrash.getState().restoreItem(items[0].id);
-                      }
-                    },
-                  },
-                });
               }}
               className="p-1 text-faint hover:text-rose-500 rounded transition-colors"
             >

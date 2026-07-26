@@ -36,6 +36,8 @@ export function CalendarPage() {
     visibleCategories,
     googleConnected,
     googleEmail,
+    googleIcalUrl,
+    syncingGoogle,
     selectedDate,
     viewMode,
     setSelectedDate,
@@ -44,7 +46,8 @@ export function CalendarPage() {
     addEvent,
     updateEvent,
     deleteEvent,
-    connectGoogle,
+    syncIcalUrl,
+    syncIcalContent,
     disconnectGoogle
   } = useCalendar();
 
@@ -437,21 +440,33 @@ export function CalendarPage() {
             {googleConnected ? (
               <div className="flex flex-col gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/5 p-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <span className="h-2 w-2 rounded-full bg-blue-500" />
-                    <span className="font-semibold text-blue-600 dark:text-blue-400">Google Agenda</span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                    <span className="font-semibold text-blue-600 dark:text-blue-400 truncate">Google Agenda</span>
                   </div>
-                  <span className="text-[10px] bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-medium">Ativo</span>
+                  <span className="text-[10px] bg-blue-500/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded font-medium shrink-0">Ativo</span>
                 </div>
-                <p className="text-[11px] text-faint truncate">{googleEmail}</p>
+                <p className="text-[11px] text-faint truncate">{googleEmail || "Sincronizado"}</p>
                 <div className="flex items-center justify-between mt-1 pt-1 border-t border-blue-500/10">
-                  <button
-                    type="button"
-                    onClick={() => connectGoogle(googleEmail || undefined)}
-                    className="flex items-center gap-1 text-[10.5px] text-blue-500 hover:underline"
-                  >
-                    <RefreshCw size={10} /> Sync
-                  </button>
+                  {googleIcalUrl ? (
+                    <button
+                      type="button"
+                      disabled={syncingGoogle}
+                      onClick={() => void syncIcalUrl(googleIcalUrl, googleEmail || undefined)}
+                      className="flex items-center gap-1 text-[10.5px] text-blue-500 hover:underline disabled:opacity-50"
+                    >
+                      <RefreshCw size={10} className={syncingGoogle ? "animate-spin" : ""} />
+                      {syncingGoogle ? "Sincronizando..." : "Sincronizar"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setGoogleModalOpen(true)}
+                      className="flex items-center gap-1 text-[10.5px] text-blue-500 hover:underline"
+                    >
+                      Configurar Link
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={disconnectGoogle}
@@ -665,60 +680,20 @@ export function CalendarPage() {
 
       {/* Google Calendar Connect Modal */}
       {googleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-xl border border-line-soft bg-bg p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-line-soft">
-              <h3 className="text-base font-semibold text-ink flex items-center gap-2">
-                Conectar Google Agenda
-              </h3>
-              <button
-                type="button"
-                onClick={() => setGoogleModalOpen(false)}
-                className="p-1 rounded-md text-faint hover:text-ink hover:bg-hover"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="flex flex-col gap-4 pt-4 text-xs">
-              <p className="text-muted leading-relaxed">
-                Sincronize seus compromissos e eventos do Google Calendar diretamente no Markd.
-              </p>
-
-              <div className="flex flex-col gap-1">
-                <label className="font-semibold text-faint text-[11px] uppercase">E-mail da Conta Google</label>
-                <input
-                  type="email"
-                  defaultValue="d.sena@vicunha.com"
-                  id="google-email-input"
-                  className="w-full rounded-md border border-line-soft bg-panel px-3 py-2 text-ink outline-none focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line-soft">
-                <button
-                  type="button"
-                  onClick={() => setGoogleModalOpen(false)}
-                  className="rounded-lg border border-line-soft px-3 py-1.5 text-muted hover:text-ink hover:bg-hover font-medium"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const input = document.getElementById("google-email-input") as HTMLInputElement;
-                    const email = input?.value || "d.sena@vicunha.com";
-                    connectGoogle(email);
-                    setGoogleModalOpen(false);
-                  }}
-                  className="rounded-lg bg-blue-600 px-4 py-1.5 font-medium text-white hover:bg-blue-500 flex items-center gap-1.5"
-                >
-                  <Check size={14} /> Auto-Conectar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <GoogleConnectModal
+          onClose={() => setGoogleModalOpen(false)}
+          defaultEmail={googleEmail || ""}
+          defaultUrl={googleIcalUrl || ""}
+          onSyncUrl={async (url, email) => {
+            const success = await syncIcalUrl(url, email);
+            if (success) setGoogleModalOpen(false);
+          }}
+          onSyncContent={(content, email) => {
+            const success = syncIcalContent(content, email);
+            if (success) setGoogleModalOpen(false);
+          }}
+          syncing={syncingGoogle}
+        />
       )}
     </div>
   );
@@ -1055,6 +1030,167 @@ function MonthView({
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function GoogleConnectModal({
+  onClose,
+  defaultEmail,
+  defaultUrl,
+  onSyncUrl,
+  onSyncContent,
+  syncing,
+}: {
+  onClose: () => void;
+  defaultEmail: string;
+  defaultUrl: string;
+  onSyncUrl: (url: string, email: string) => Promise<void>;
+  onSyncContent: (content: string, email: string) => void;
+  syncing: boolean;
+}) {
+  const [method, setMethod] = useState<"url" | "file">("url");
+  const [email, setEmail] = useState(defaultEmail || "");
+  const [url, setUrl] = useState(defaultUrl || "");
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      if (content) {
+        onSyncContent(content, email || file.name);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="w-full max-w-md rounded-xl border border-line-soft bg-bg p-5 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+        <div className="flex items-center justify-between pb-3 border-b border-line-soft">
+          <h3 className="text-sm font-semibold text-ink flex items-center gap-2">
+            Sincronizar Google Agenda Real
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1 rounded-md text-faint hover:text-ink hover:bg-hover"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-4 pt-3 text-xs">
+          <p className="text-muted leading-relaxed">
+            Para sincronizar seus eventos reais do Google Agenda no seu Markd para Windows de forma 100% privada e sem servidores intermediários, escolha uma das opções abaixo:
+          </p>
+
+          <div className="flex rounded-lg border border-line-soft bg-panel p-0.5">
+            <button
+              type="button"
+              onClick={() => setMethod("url")}
+              className={cx(
+                "flex-1 rounded-md py-1.5 text-[11.5px] font-medium transition-colors",
+                method === "url" ? "bg-bg text-ink shadow-xs" : "text-muted hover:text-ink"
+              )}
+            >
+              Link Secreto iCal (.ics)
+            </button>
+            <button
+              type="button"
+              onClick={() => setMethod("file")}
+              className={cx(
+                "flex-1 rounded-md py-1.5 text-[11.5px] font-medium transition-colors",
+                method === "file" ? "bg-bg text-ink shadow-xs" : "text-muted hover:text-ink"
+              )}
+            >
+              Importar Arquivo .ics
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="font-semibold text-faint text-[11px] uppercase">Seu E-mail do Google (Opcional)</label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu-email@gmail.com"
+              className="w-full rounded-md border border-line-soft bg-panel px-3 py-2 text-ink outline-none focus:border-blue-500"
+            />
+          </div>
+
+          {method === "url" ? (
+            <div className="flex flex-col gap-3">
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-2.5 text-[11px] text-faint leading-normal">
+                <p className="font-semibold text-blue-600 dark:text-blue-400 mb-1">Como obter seu Link Secreto iCal:</p>
+                <ol className="list-decimal list-inside space-y-0.5">
+                  <li>Acesse o Google Agenda no navegador web.</li>
+                  <li>Clique na engrenagem ⚙️ &gt; <strong>Configurações</strong>.</li>
+                  <li>Selecione sua agenda na barra lateral &gt; <strong>Integrar agenda</strong>.</li>
+                  <li>Copie o <strong>Endereço secreto em formato iCal</strong>.</li>
+                </ol>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-faint text-[11px] uppercase">Link Secreto iCal (.ics)</label>
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  placeholder="https://calendar.google.com/calendar/ical/.../basic.ics"
+                  className="w-full rounded-md border border-line-soft bg-panel px-3 py-2 text-ink outline-none focus:border-blue-500 font-mono text-[11px]"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line-soft">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-lg border border-line-soft px-3 py-1.5 text-muted hover:text-ink hover:bg-hover font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={!url.trim() || syncing}
+                  onClick={() => void onSyncUrl(url.trim(), email)}
+                  className="rounded-lg bg-blue-600 px-4 py-1.5 font-medium text-white hover:bg-blue-500 flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {syncing ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+                  {syncing ? "Sincronizando..." : "Sincronizar Eventos Reais"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="font-semibold text-faint text-[11px] uppercase">Selecionar Arquivo .ics</label>
+                <input
+                  type="file"
+                  accept=".ics"
+                  onChange={handleFileUpload}
+                  className="w-full rounded-md border border-line-soft bg-panel p-2 text-ink text-[11px]"
+                />
+                <span className="text-[10.5px] text-faint mt-1">
+                  Exporte o arquivo de agenda no Google Agenda (Configurações &gt; Importar/Exportar) e selecione o arquivo .ics aqui.
+                </span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-line-soft">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-lg border border-line-soft px-3 py-1.5 text-muted hover:text-ink hover:bg-hover font-medium"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

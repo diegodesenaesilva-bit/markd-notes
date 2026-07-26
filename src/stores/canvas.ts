@@ -38,6 +38,7 @@ interface CanvasState {
   createCanvas: (name: string) => Promise<string>;
   renameCanvas: (id: string, name: string) => Promise<void>;
   deleteCanvas: (id: string) => Promise<void>;
+  reorderCanvas: (fromIndex: number, toIndex: number) => Promise<void>;
 
   addNode: (node: Partial<CanvasNode>) => string;
   updateNode: (id: string, patch: Partial<CanvasNode>) => void;
@@ -334,6 +335,15 @@ export const useCanvas = create<CanvasState>((set, get) => ({
       const nextId = newList[0]?.id || "default";
       await get().load(nextId);
     }
+  },
+
+  reorderCanvas: async (fromIndex: number, toIndex: number) => {
+    const list = [...get().canvasList];
+    if (fromIndex < 0 || fromIndex >= list.length || toIndex < 0 || toIndex >= list.length) return;
+    const [removed] = list.splice(fromIndex, 1);
+    list.splice(toIndex, 0, removed);
+    set({ canvasList: list });
+    await ipc.canvasListSave(list);
   },
 
   addNode: (partialNode) => {
