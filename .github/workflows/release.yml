@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Auto-sync project versions and clean conflicts
+        run: node scripts/sync-version.js
+
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
