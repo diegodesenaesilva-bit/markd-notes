@@ -91,6 +91,9 @@ export function TodosPage() {
   }, [parentTodos, todayStart, activeTab, selectedProject]);
 
   const todayTodos = useMemo(() => {
+    if (activeTab === "completed") {
+      return parentTodos;
+    }
     if (activeTab === "today" || activeTab === "inbox") {
       return parentTodos.filter((t) => !t.done && (!t.dueDate || t.dueDate >= todayStart));
     }
