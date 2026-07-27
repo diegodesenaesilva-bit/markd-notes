@@ -38,19 +38,11 @@ jobs:
         with:
           bun-version: 1.3.0
 
-      - name: Set up Node.js for repair
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Auto-repair project
-        run: node scripts/ci-auto-repair.js
-
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install frontend dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
 
       - name: Run frontend tests
         run: bun test
@@ -59,4 +51,4 @@ jobs:
         run: bunx tsc --noEmit
 
       - name: Run Rust tests
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked

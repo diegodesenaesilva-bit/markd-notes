@@ -83,6 +83,7 @@ export function GeneralSettings() {
   };
 
   const handleTestConnection = async () => {
+    setActiveProvider("gemini");
     setTestingAi(true);
     setTestResult(null);
     try {
