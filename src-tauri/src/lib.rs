@@ -21,6 +21,7 @@ mod util;
 mod vault;
 
 use commands::AppState;
+use tauri::Manager;
 use tauri_plugin_global_shortcut::ShortcutState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
