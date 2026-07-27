@@ -8,6 +8,7 @@ interface AddSmartTodoOptions {
   text: string;
   tags?: string[];
   dueDate?: number | null;
+  priority?: "p1" | "p2" | "p3" | "p4";
   projectId?: string | null;
   parentId?: string | null;
 }
@@ -25,6 +26,7 @@ interface TodosState {
   toggle: (id: string) => Promise<void>;
   updateText: (id: string, text: string) => Promise<void>;
   setDueDate: (id: string, dueDate: number | null) => void;
+  setPriority: (id: string, priority: "p1" | "p2" | "p3" | "p4") => void;
   rescheduleOverdueToToday: () => void;
   setTags: (id: string, tags: string[]) => Promise<void>;
   createTag: (name: string) => Promise<void>;
@@ -68,7 +70,7 @@ export const useTodos = create<TodosState>((set, get) => ({
     }
   },
 
-  addSmart: async ({ text, tags, dueDate, projectId, parentId }) => {
+  addSmart: async ({ text, tags, dueDate, priority, projectId, parentId }) => {
     try {
       let todo = await ipc.todoAdd(text);
       const combinedTags = Array.from(new Set([...(tags || [])]));
@@ -76,6 +78,7 @@ export const useTodos = create<TodosState>((set, get) => ({
         todo = await ipc.todoSetTags(todo.id, combinedTags);
       }
       todo.dueDate = dueDate;
+      todo.priority = priority || "p4";
       todo.projectId = projectId;
       todo.parentId = parentId;
 
@@ -92,14 +95,32 @@ export const useTodos = create<TodosState>((set, get) => ({
   },
 
   toggle: async (id) => {
+    const now = Date.now();
     set({
-      todos: get().todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)),
+      todos: get().todos.map((t) =>
+        t.id === id
+          ? {
+              ...t,
+              done: !t.done,
+              completedAt: !t.done ? now : null,
+            }
+          : t
+      ),
     });
     try {
       const updated = await ipc.todoToggle(id);
       set({
         todos: get().todos.map((t) =>
-          t.id === id ? { ...t, ...updated, dueDate: t.dueDate, parentId: t.parentId } : t
+          t.id === id
+            ? {
+                ...t,
+                ...updated,
+                dueDate: t.dueDate,
+                priority: t.priority || "p4",
+                parentId: t.parentId,
+                completedAt: updated.done ? updated.completedAt || now : null,
+              }
+            : t
         ),
       });
     } catch (err) {
@@ -113,7 +134,15 @@ export const useTodos = create<TodosState>((set, get) => ({
       const updated = await ipc.todoUpdate(id, text);
       set({
         todos: get().todos.map((t) =>
-          t.id === id ? { ...t, ...updated, dueDate: t.dueDate, parentId: t.parentId } : t
+          t.id === id
+            ? {
+                ...t,
+                ...updated,
+                dueDate: t.dueDate,
+                priority: t.priority,
+                parentId: t.parentId,
+              }
+            : t
         ),
       });
     } catch (err) {
@@ -124,6 +153,12 @@ export const useTodos = create<TodosState>((set, get) => ({
   setDueDate: (id, dueDate) => {
     set({
       todos: get().todos.map((t) => (t.id === id ? { ...t, dueDate } : t)),
+    });
+  },
+
+  setPriority: (id, priority) => {
+    set({
+      todos: get().todos.map((t) => (t.id === id ? { ...t, priority } : t)),
     });
   },
 

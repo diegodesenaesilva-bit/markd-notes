@@ -73,9 +73,10 @@ Responda APENAS no seguinte formato estrito em Português do Brasil:
 [AMIGAVEL]
 (Escreva aqui a versão amigável)`;
 
-      const response = await chatWithOnlineAi({
+      const responseObj = await chatWithOnlineAi({
         messages: [{ role: "user", text: prompt }],
       });
+      const response = responseObj.text;
 
       let formalText = "";
       let friendlyText = "";

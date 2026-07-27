@@ -7,12 +7,18 @@ import {
   X,
   ArrowRight,
   User,
-  Plus,
   FileText,
   CalendarDays,
   CheckCircle2,
   Palette,
   Settings,
+  Globe,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  Image as ImageIcon,
+  ExternalLink,
 } from "lucide-react";
 import { chatWithOnlineAi, cleanAiMarkdown, type ChatMessage } from "@/lib/ai";
 import { useAiStore } from "@/stores/ai";
@@ -24,6 +30,18 @@ import { useCanvas } from "@/stores/canvas";
 import { Spinner } from "@/components/ui/Spinner";
 import { GeminiIcon } from "@/components/ui/GeminiIcon";
 import { cx } from "@/lib/utils";
+import { toast } from "sonner";
+
+interface ExtendedChatMessage extends ChatMessage {
+  groundingMetadata?: any;
+  images?: string[];
+}
+
+interface AttachedImage {
+  data: string;
+  mimeType: string;
+  preview: string;
+}
 
 interface AskMarkSidebarProps {
   isOpen: boolean;
@@ -44,11 +62,19 @@ export function AskMarkSidebar({
   onInsertResult: propOnInsertResult,
   hideHeader = false,
 }: AskMarkSidebarProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ExtendedChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
   const [shareContext, setShareContext] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Gemini Features State
+  const [useSearchGrounding, setUseSearchGrounding] = useState(false);
+  const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
+  const [isListening, setIsListening] = useState(false);
+  const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const uiStore = useUi();
   const currentView = useVault((s) => s.view);
@@ -95,8 +121,8 @@ export function AskMarkSidebar({
   };
 
   const hasApiKey =
-    (activeProvider === "gemini") ||
-    (activeProvider === "ollama_cloud") ||
+    activeProvider === "gemini" ||
+    activeProvider === "ollama_cloud" ||
     (activeProvider === "groq" && !!groqApiKey) ||
     (activeProvider === "openai" && !!openaiApiKey) ||
     (activeProvider === "claude" && !!claudeApiKey) ||
@@ -153,7 +179,9 @@ export function AskMarkSidebar({
             x: 120 + Math.floor(Math.random() * 220),
             y: 120 + Math.floor(Math.random() * 220),
           });
-          executedLogs.push(`Item adicionado ao Moodboard: "${data.title || (data.content ? data.content.slice(0, 25) + '...' : 'Card')}"`);
+          executedLogs.push(
+            `Item adicionado ao Moodboard: "${data.title || (data.content ? data.content.slice(0, 25) + '...' : 'Card')}"`
+          );
         }
       };
 
@@ -167,7 +195,7 @@ export function AskMarkSidebar({
             processSingleAction(data);
           }
         } catch {
-          // ignore non-matching code blocks
+          // ignore non-matching blocks
         }
       }
     } catch {
@@ -176,26 +204,157 @@ export function AskMarkSidebar({
     return executedLogs;
   };
 
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (!file.type.startsWith("image/")) {
+        toast.error("Por favor selecione um arquivo de imagem.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string;
+        if (base64) {
+          setAttachedImages((prev) => [
+            ...prev,
+            { data: base64, mimeType: file.type, preview: base64 },
+          ]);
+          toast.success("Imagem anexada para análise!");
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const removeImage = (index: number) => {
+    setAttachedImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const startSpeechRecognition = () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      toast.error("Reconhecimento de voz não é suportado neste navegador.");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = "pt-BR";
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        toast("Escutando... Fale seu comando ou dúvida.");
+      };
+
+      recognition.onresult = (event: any) => {
+        const transcript = event.results?.[0]?.[0]?.transcript;
+        if (transcript) {
+          setInputText((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          toast.success("Voz convertida em texto!");
+        }
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+        toast.error("Não foi possível reconhecer a voz. Tente novamente.");
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognition.start();
+    } catch {
+      setIsListening(false);
+      toast.error("Erro ao iniciar microfone.");
+    }
+  };
+
+  const playSpeechSynthesis = async (text: string, index: number) => {
+    if (playingAudioIndex === index) {
+      window.speechSynthesis?.cancel();
+      setPlayingAudioIndex(null);
+      return;
+    }
+
+    setPlayingAudioIndex(index);
+
+    const cleanText = cleanAiMarkdown(text).replace(/[#*`_~]/g, "");
+
+    // 1. Try Gemini TTS endpoint
+    try {
+      const res = await fetch("/api/gemini/tts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: cleanText.slice(0, 400) }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.audio) {
+          const audio = new Audio(`data:${data.mimeType || "audio/mp3"};base64,${data.audio}`);
+          audio.onended = () => setPlayingAudioIndex(null);
+          audio.onerror = () => fallbackWebSpeech(cleanText);
+          await audio.play();
+          return;
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    fallbackWebSpeech(cleanText);
+  };
+
+  const fallbackWebSpeech = (text: string) => {
+    if (!("speechSynthesis" in window)) {
+      toast.error("Síntese de voz não suportada no navegador.");
+      setPlayingAudioIndex(null);
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text.slice(0, 500));
+    utterance.lang = "pt-BR";
+    utterance.onend = () => setPlayingAudioIndex(null);
+    utterance.onerror = () => setPlayingAudioIndex(null);
+    window.speechSynthesis.speak(utterance);
+  };
+
   const handleSendMessage = async (userPrompt?: string) => {
     const textToSend = userPrompt || inputText;
-    if (!textToSend.trim()) return;
+    if (!textToSend.trim() && attachedImages.length === 0) return;
 
     if (!hasApiKey) {
       setError(`A chave da API para ${providerNames[activeProvider]} não foi configurada.`);
       return;
     }
 
-    const newMessages: ChatMessage[] = [
+    const currentImages = [...attachedImages];
+    const imagePreviews = currentImages.map((img) => img.preview);
+
+    const newMessages: ExtendedChatMessage[] = [
       ...messages,
-      { role: "user", text: textToSend.trim() },
+      {
+        role: "user",
+        text: textToSend.trim() || "Analise a imagem em anexo e extraia as informações.",
+        images: imagePreviews.length > 0 ? imagePreviews : undefined,
+      },
     ];
 
     setMessages(newMessages);
     if (!userPrompt) setInputText("");
+    setAttachedImages([]);
     setLoading(true);
     setError(null);
 
-    // Build context header based on active page view
     let contextHeader = `[INSTRUÇÕES DE FORMATAÇÃO DA RESPOSTA]:
 1. Mantenha suas respostas diretas, bem estruturadas e amigáveis em Português do Brasil.
 2. Evite repetir blocos de texto excessivamente longos ou desnecessários.
@@ -206,7 +365,10 @@ export function AskMarkSidebar({
 
     if (viewType === "calendar" && shareContext) {
       const events = useCalendar.getState().events;
-      const eventsSummary = events.slice(0, 15).map(e => `- [${e.date} ${e.startTime}-${e.endTime}] ${e.title} (${e.category})`).join("\n");
+      const eventsSummary = events
+        .slice(0, 15)
+        .map((e) => `- [${e.date} ${e.startTime}-${e.endTime}] ${e.title} (${e.category})`)
+        .join("\n");
       contextHeader += `[CONTEXTO DA TELA ATUAL: AGENDA / CALENDÁRIO]:
 Data de Hoje: ${new Date().toISOString().split("T")[0]}
 Eventos Agendados Atuais:
@@ -224,11 +386,18 @@ Para agendar compromissos, inclua ao final da sua resposta blocos JSON com a aç
   "category": "event"
 }
 \`\`\`
-Pode incluir múltiplos blocos se o usuário solicitar mais de um compromisso.
 \n\n`;
     } else if (viewType === "todos" && shareContext) {
       const todos = useTodos.getState().todos;
-      const todosSummary = todos.slice(0, 20).map(t => `- [${t.done ? "Concluída" : "Pendente"}] ${t.text} ${t.tags.length ? `(#${t.tags.join(" #")})` : ""}`).join("\n");
+      const todosSummary = todos
+        .slice(0, 20)
+        .map(
+          (t) =>
+            `- [${t.done ? "Concluída" : "Pendente"}] ${t.text} ${
+              t.tags.length ? `(#${t.tags.join(" #")})` : ""
+            }`
+        )
+        .join("\n");
       contextHeader += `[CONTEXTO DA TELA ATUAL: TAREFAS / TODOS]:
 Lista de Tarefas Atuais:
 ${todosSummary || "(Nenhuma tarefa cadastrada)"}
@@ -242,29 +411,33 @@ Para criar tarefas, inclua ao final da sua resposta blocos JSON com a ação "ad
   "tags": ["tag1", "tag2"]
 }
 \`\`\`
-Pode incluir múltiplos blocos se o usuário solicitar mais de uma tarefa.
 \n\n`;
     } else if (viewType === "canvas" && shareContext) {
       const nodes = useCanvas.getState().nodes;
-      const canvasName = useCanvas.getState().canvasList.find(c => c.id === useCanvas.getState().currentCanvasId)?.name || "Moodboard";
-      const nodesSummary = nodes.slice(0, 20).map(n => `- [${n.type.toUpperCase()}] ${n.title ? n.title + ": " : ""}${n.content}`).join("\n");
+      const canvasName =
+        useCanvas
+          .getState()
+          .canvasList.find((c) => c.id === useCanvas.getState().currentCanvasId)?.name ||
+        "Moodboard";
+      const nodesSummary = nodes
+        .slice(0, 20)
+        .map((n) => `- [${n.type.toUpperCase()}] ${n.title ? n.title + ": " : ""}${n.content}`)
+        .join("\n");
       contextHeader += `[CONTEXTO DA TELA ATUAL: MOODBOARD / QUADRO "${canvasName}"]:
 Itens e Ideias no Moodboard Atualmente:
 ${nodesSummary || "(Moodboard vazio)"}
 
 INSTRUÇÕES DE AÇÃO NO MOODBOARD:
-Para ADICIONAR ou INCLUIR sticky notes ou cards diretamente na tela do Moodboard, inclua ao final da sua resposta um ou mais blocos JSON com a ação "add_canvas_node" como no exemplo:
+Para ADICIONAR sticky notes no Moodboard, inclua blocos JSON com a ação "add_canvas_node":
 \`\`\`json
 {
   "action": "add_canvas_node",
   "type": "sticky",
   "title": "Título do Card",
-  "content": "Conteúdo com a ideia ou referência",
+  "content": "Conteúdo",
   "color": "yellow"
 }
 \`\`\`
-Cores aceitas para "color": "yellow", "blue", "green", "pink", "purple".
-Pode incluir múltiplos blocos se o usuário pedir para adicionar mais de uma ideia.
 \n\n`;
     } else if (shareContext) {
       contextHeader += `[CONTEXTO DA NOTA ATUAL]:
@@ -277,17 +450,27 @@ ${selectedText || noteContent || "(Nota Vazia)"}
     }
 
     try {
-      const responseText = await chatWithOnlineAi({
-        messages: newMessages,
+      const responseObj = await chatWithOnlineAi({
+        messages: newMessages.map((m) => ({ role: m.role, text: m.text })),
         noteTitle: viewType === "note" ? noteTitle : undefined,
-        noteContent: contextHeader + (shareContext ? (selectedText || noteContent) : ""),
+        noteContent: contextHeader + (shareContext ? selectedText || noteContent : ""),
+        useSearchGrounding,
+        images: currentImages.map((img) => ({ data: img.data, mimeType: img.mimeType })),
       });
 
+      const responseText = responseObj.text;
       executeAiAction(responseText);
 
       const cleanedText = stripActionJson(responseText);
 
-      setMessages([...newMessages, { role: "assistant", text: cleanedText }]);
+      setMessages([
+        ...newMessages,
+        {
+          role: "assistant",
+          text: cleanedText,
+          groundingMetadata: responseObj.groundingMetadata,
+        },
+      ]);
     } catch (err: any) {
       setError(err.message || `Erro na comunicação com a IA.`);
     } finally {
@@ -297,12 +480,27 @@ ${selectedText || noteContent || "(Nota Vazia)"}
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text);
+    toast.success("Texto copiado para a área de transferência!");
   };
 
   const currentViewType = currentView?.type || "note";
 
   return (
-    <div className={cx("relative flex h-full w-full flex-col bg-bg transition-all duration-200", !hideHeader && "border-l border-line shadow-2xl z-30")}>
+    <div
+      className={cx(
+        "relative flex h-full w-full flex-col bg-bg transition-all duration-200",
+        !hideHeader && "border-l border-line shadow-2xl z-30"
+      )}
+    >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleImageFileChange}
+      />
+
       {/* Header */}
       {!hideHeader && (
         <div className="flex items-center justify-between border-b border-line px-4 py-3 bg-panel/50">
@@ -313,7 +511,7 @@ ${selectedText || noteContent || "(Nota Vazia)"}
             <div>
               <h3 className="text-sm font-semibold text-ink flex items-center gap-1.5">
                 <GeminiIcon size={15} />
-                <span>Peça ao Gemini</span>
+                <span>Mark IA & Gemini</span>
               </h3>
               <span className="text-[10px] text-faint flex items-center gap-1 font-medium">
                 {providerNames[activeProvider]}
@@ -322,6 +520,30 @@ ${selectedText || noteContent || "(Nota Vazia)"}
           </div>
 
           <div className="flex items-center gap-1">
+            {activeProvider === "gemini" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setUseSearchGrounding(!useSearchGrounding);
+                  toast(
+                    useSearchGrounding
+                      ? "Google Search Grounding desativado."
+                      : "Google Search Grounding ativado! As respostas incluirão dados atualizados da web."
+                  );
+                }}
+                className={cx(
+                  "flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors",
+                  useSearchGrounding
+                    ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/40"
+                    : "text-faint hover:bg-hover hover:text-ink"
+                )}
+                title="Ativar/Desativar busca online do Google"
+              >
+                <Globe size={13} />
+                <span className="hidden sm:inline">Google Search</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={() => setSettingsOpen(true)}
@@ -344,14 +566,14 @@ ${selectedText || noteContent || "(Nota Vazia)"}
 
       {/* Main Body */}
       <div className="flex flex-1 flex-col overflow-y-auto p-4 space-y-4">
-        {/* Missing API Key Warning */}
         {!hasApiKey && (
           <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2 shadow-xs">
             <h4 className="text-xs font-semibold text-amber-600 dark:text-amber-400">
               Configure a Chave da API ({providerNames[activeProvider]})
             </h4>
             <p className="text-[11px] text-faint leading-relaxed">
-              Você selecionou a IA <b>{providerNames[activeProvider]}</b>. Cole sua chave de API nas configurações do Markd para começar a usar.
+              Você selecionou a IA <b>{providerNames[activeProvider]}</b>. Cole sua chave de API nas
+              configurações do Markd para começar a usar.
             </p>
             <button
               type="button"
@@ -363,19 +585,25 @@ ${selectedText || noteContent || "(Nota Vazia)"}
           </div>
         )}
 
-        {/* Empty State / Greeting */}
         {messages.length === 0 && (
           <div className="my-auto space-y-5 pt-2">
             <div className="space-y-1">
               <h2 className="text-2xl font-semibold text-purple-600 dark:text-purple-400">
-                Olá, Diego
+                Olá
               </h2>
               <p className="text-xl font-medium text-ink">
-                Como posso ajudar com {currentViewType === "calendar" ? "sua agenda" : currentViewType === "todos" ? "suas tarefas" : currentViewType === "canvas" ? "seu moodboard" : "suas notas"} hoje?
+                Como posso ajudar com{" "}
+                {currentViewType === "calendar"
+                  ? "sua agenda"
+                  : currentViewType === "todos"
+                  ? "suas tarefas"
+                  : currentViewType === "canvas"
+                  ? "seu moodboard"
+                  : "suas notas"}{" "}
+                hoje?
               </p>
             </div>
 
-            {/* Context Badge */}
             {shareContext && (
               <div className="flex items-center justify-between rounded-xl border border-line bg-panel/70 p-2.5 text-xs text-ink shadow-xs">
                 <div className="flex items-center gap-2 min-w-0">
@@ -389,7 +617,8 @@ ${selectedText || noteContent || "(Nota Vazia)"}
                     <FileText size={15} className="text-purple-500 shrink-0" />
                   )}
                   <span className="truncate text-faint">
-                    Contexto: <strong className="text-ink">
+                    Contexto:{" "}
+                    <strong className="text-ink">
                       {currentViewType === "calendar"
                         ? "Agenda / Calendário"
                         : currentViewType === "todos"
@@ -411,89 +640,73 @@ ${selectedText || noteContent || "(Nota Vazia)"}
               </div>
             )}
 
-            {/* Quick Action Pills based on active page */}
-            <div className="space-y-2">
-              {currentViewType === "calendar" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Marque uma reunião amanhã às 15:00 chamada 'Alinhamento do Projeto' na minha agenda")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    📅 Marcar compromisso na agenda
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Quais são meus compromissos agendados para hoje? Resuma em tópicos.")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    📋 Listar meus compromissos de hoje
-                  </button>
-                </>
-              ) : currentViewType === "todos" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Crie 3 tarefas prioritárias para a entrega do projeto com tags adequadas")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    ✅ Criar e formatar tarefas automaticamente
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Organize minhas tarefas pendentes por ordem de prioridade e urgência")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    📌 Analisar e priorizar tarefas pendentes
-                  </button>
-                </>
-              ) : currentViewType === "canvas" ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Análise todas as ideias do moodboard atual, conecte os conceitos e sugira 3 novos sticky notes de referências")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    💡 Analisar ideias e adicionar referências no Moodboard
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Crie um novo sticky note com inspirações de paleta de cores e tipografia para este moodboard")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    🎨 Incluir nota de design no Moodboard
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Resuma os pontos principais desta nota em marcadores")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    Resumir os pontos principais desta nota
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Corrija os erros de ortografia e melhore o estilo deste texto")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    Corrigir ortografia e melhorar o estilo do texto
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSendMessage("Crie uma lista de tarefas detalhada a partir desta nota e adicione às minhas tarefas")}
-                    className="w-full text-left rounded-2xl border border-line/80 bg-panel/40 p-3 text-xs text-ink hover:bg-hover transition-colors shadow-xs"
-                  >
-                    Criar tarefas a partir desta nota
-                  </button>
-                </>
+            {/* AI Capabilities Cards */}
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setUseSearchGrounding(true);
+                  handleSendMessage("Pesquise na web com Google e me traga as últimas novidades sobre IA e produtividade");
+                }}
+                className="flex items-center gap-3 rounded-2xl border border-line/80 bg-panel/40 p-3 text-left text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+              >
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-blue-500/10 text-blue-500 shrink-0">
+                  <Globe size={16} />
+                </div>
+                <div>
+                  <div className="font-semibold text-ink">Google Search Data</div>
+                  <div className="text-[11px] text-faint">Pesquise dados atualizados da internet em tempo real</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-3 rounded-2xl border border-line/80 bg-panel/40 p-3 text-left text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+              >
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-purple-500/10 text-purple-500 shrink-0">
+                  <ImageIcon size={16} />
+                </div>
+                <div>
+                  <div className="font-semibold text-ink">Escanear Documento / Imagem</div>
+                  <div className="text-[11px] text-faint">Envie fotos, documentos ou telas para o Gemini analisar</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={startSpeechRecognition}
+                className="flex items-center gap-3 rounded-2xl border border-line/80 bg-panel/40 p-3 text-left text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+              >
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-emerald-500/10 text-emerald-500 shrink-0">
+                  <Mic size={16} />
+                </div>
+                <div>
+                  <div className="font-semibold text-ink">Conversa por Voz</div>
+                  <div className="text-[11px] text-faint">Fale com o Mark IA por microfone e ouça as respostas</div>
+                </div>
+              </button>
+
+              {currentViewType === "note" && (
+                <button
+                  type="button"
+                  onClick={() => handleSendMessage("Resuma os pontos mais importantes desta nota em um checklist de ações")}
+                  className="flex items-center gap-3 rounded-2xl border border-line/80 bg-panel/40 p-3 text-left text-xs text-ink hover:bg-hover transition-colors shadow-xs"
+                >
+                  <div className="grid h-8 w-8 place-items-center rounded-xl bg-amber-500/10 text-amber-500 shrink-0">
+                    <Sparkles size={16} />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-ink">Inteligência Gemini</div>
+                    <div className="text-[11px] text-faint">Resuma a nota, extraia tarefas ou melhore o texto</div>
+                  </div>
+                </button>
               )}
             </div>
           </div>
         )}
 
-        {/* Chat Stream */}
+        {/* Chat Thread */}
         {messages.map((msg, index) => (
           <div
             key={index}
@@ -508,11 +721,11 @@ ${selectedText || noteContent || "(Nota Vazia)"}
                 </>
               ) : (
                 <>
-                  <Sparkles size={12} className="text-purple-500" />{" "}
-                  <span>Mark IA</span>
+                  <Sparkles size={12} className="text-purple-500" /> <span>Mark IA</span>
                 </>
               )}
             </div>
+
             <div
               className={`max-w-[92%] rounded-2xl p-3 text-xs leading-relaxed ${
                 msg.role === "user"
@@ -520,16 +733,61 @@ ${selectedText || noteContent || "(Nota Vazia)"}
                   : "bg-panel border border-line text-ink rounded-bl-none overflow-hidden"
               }`}
             >
+              {msg.images && msg.images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {msg.images.map((img, imgIdx) => (
+                    <img
+                      key={imgIdx}
+                      src={img}
+                      alt="Anexo"
+                      className="h-20 w-20 object-cover rounded-lg border border-white/20"
+                    />
+                  ))}
+                </div>
+              )}
+
               {msg.role === "assistant" ? (
                 <div className="space-y-2 select-text [&_p]:leading-relaxed [&_p]:my-1.5 [&_h1]:text-sm [&_h1]:font-bold [&_h1]:mt-3 [&_h1]:mb-1 [&_h2]:text-xs [&_h2]:font-bold [&_h2]:mt-2.5 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:my-1.5 [&_ol]:list-decimal [&_ol]:pl-4 [&_ol]:my-1.5 [&_li]:my-0.5 [&_hr]:my-2.5 [&_hr]:border-line [&_code]:bg-hover [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:font-mono [&_code]:text-[11px] [&_pre]:bg-hover [&_pre]:p-2 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_blockquote]:border-l-2 [&_blockquote]:border-purple-500/50 [&_blockquote]:pl-2 [&_blockquote]:italic [&_strong]:font-semibold [&_strong]:text-ink">
                   <Markdown>{cleanAiMarkdown(msg.text)}</Markdown>
+
+                  {/* Render Google Search Grounding Sources */}
+                  {msg.groundingMetadata?.groundingChunks &&
+                    msg.groundingMetadata.groundingChunks.length > 0 && (
+                      <div className="mt-3 border-t border-line/60 pt-2 space-y-1">
+                        <div className="flex items-center gap-1 text-[10px] font-semibold text-blue-500">
+                          <Globe size={11} />
+                          <span>Fontes do Google Search:</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {msg.groundingMetadata.groundingChunks.map(
+                            (chunk: any, chunkIdx: number) => {
+                              const web = chunk.web;
+                              if (!web?.uri) return null;
+                              return (
+                                <a
+                                  key={chunkIdx}
+                                  href={web.uri}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-md border border-line bg-hover px-2 py-1 text-[10px] text-muted hover:text-ink hover:border-blue-500/40 transition-colors"
+                                >
+                                  <span className="truncate max-w-[140px]">
+                                    {web.title || web.uri}
+                                  </span>
+                                  <ExternalLink size={10} className="shrink-0" />
+                                </a>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+                    )}
                 </div>
               ) : (
                 msg.text
               )}
             </div>
 
-            {/* Actions under assistant message */}
             {msg.role === "assistant" && (
               <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-faint">
                 <button
@@ -539,6 +797,27 @@ ${selectedText || noteContent || "(Nota Vazia)"}
                 >
                   <Copy size={12} /> Copiar
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => playSpeechSynthesis(msg.text, index)}
+                  className={cx(
+                    "flex items-center gap-1 hover:text-ink",
+                    playingAudioIndex === index && "text-purple-500 font-semibold"
+                  )}
+                  title="Ouvir resposta por voz"
+                >
+                  {playingAudioIndex === index ? (
+                    <>
+                      <VolumeX size={12} className="animate-pulse text-purple-500" /> Ouvindo...
+                    </>
+                  ) : (
+                    <>
+                      <Volume2 size={12} /> Ouvir Voz
+                    </>
+                  )}
+                </button>
+
                 {currentViewType === "note" && selectedText && (
                   <button
                     type="button"
@@ -562,15 +841,13 @@ ${selectedText || noteContent || "(Nota Vazia)"}
           </div>
         ))}
 
-        {/* Loading */}
         {loading && (
           <div className="flex items-center gap-2 text-xs text-faint py-2">
             <Spinner size={16} />
-            <span>Mark IA está processando e executando...</span>
+            <span>Mark IA está processando...</span>
           </div>
         )}
 
-        {/* Error */}
         {error && (
           <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-ink space-y-1">
             <p className="text-red-500 font-semibold">Erro de Conexão com a IA</p>
@@ -581,7 +858,30 @@ ${selectedText || noteContent || "(Nota Vazia)"}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Bottom Input Card */}
+      {/* Attached Images Preview Row */}
+      {attachedImages.length > 0 && (
+        <div className="border-t border-line bg-panel/50 px-3 py-2 flex items-center gap-2 overflow-x-auto">
+          {attachedImages.map((img, idx) => (
+            <div key={idx} className="relative group shrink-0">
+              <img
+                src={img.preview}
+                alt="Preview"
+                className="h-12 w-12 object-cover rounded-lg border border-line"
+              />
+              <button
+                type="button"
+                onClick={() => removeImage(idx)}
+                className="absolute -top-1.5 -right-1.5 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-white text-[10px]"
+              >
+                <X size={10} />
+              </button>
+            </div>
+          ))}
+          <span className="text-[11px] text-faint">Imagem pronta para análise do Gemini</span>
+        </div>
+      )}
+
+      {/* Input Bar */}
       <div className="border-t border-line bg-panel/30 p-3">
         <div className="relative rounded-2xl border border-line bg-panel p-2 shadow-sm focus-within:border-purple-500">
           <textarea
@@ -589,35 +889,71 @@ ${selectedText || noteContent || "(Nota Vazia)"}
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             placeholder={
-              currentViewType === "calendar"
+              isListening
+                ? "Escutando sua voz..."
+                : currentViewType === "calendar"
                 ? "Peça para agendar um compromisso ou consultar a agenda..."
                 : currentViewType === "todos"
                 ? "Peça para criar, formatar ou organizar tarefas..."
                 : currentViewType === "canvas"
-                ? "Peça para analisar ideias, buscar referências ou adicionar cards..."
-                : "Pergunte algo ou peça para escrever..."
+                ? "Peça para analisar ideias ou adicionar cards..."
+                : "Pergunte algo, anexe imagem ou fale por voz..."
             }
             className="w-full bg-transparent px-2 text-xs text-ink outline-none placeholder:text-faint resize-none"
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && inputText.trim() && !loading) {
+              if (e.key === "Enter" && !e.shiftKey && (inputText.trim() || attachedImages.length > 0) && !loading) {
                 e.preventDefault();
                 handleSendMessage();
               }
             }}
           />
+
           <div className="flex items-center justify-between border-t border-line/40 pt-2 px-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                className="flex h-7 w-7 items-center justify-center rounded-full bg-hover text-faint hover:text-ink"
-                title="Anexar"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-hover text-faint hover:text-ink transition-colors"
+                title="Anexar Imagem / Escanear Documento"
               >
-                <Plus size={16} />
+                <ImageIcon size={15} />
               </button>
+
+              <button
+                type="button"
+                onClick={startSpeechRecognition}
+                className={cx(
+                  "flex h-7 w-7 items-center justify-center rounded-full transition-colors",
+                  isListening
+                    ? "bg-rose-500 text-white animate-pulse"
+                    : "bg-hover text-faint hover:text-ink"
+                )}
+                title="Falar por voz (Speech to text)"
+              >
+                {isListening ? <MicOff size={15} /> : <Mic size={15} />}
+              </button>
+
+              {activeProvider === "gemini" && (
+                <button
+                  type="button"
+                  onClick={() => setUseSearchGrounding(!useSearchGrounding)}
+                  className={cx(
+                    "flex h-7 px-2 items-center justify-center rounded-full text-[11px] font-medium transition-colors",
+                    useSearchGrounding
+                      ? "bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/40"
+                      : "bg-hover text-faint hover:text-ink"
+                  )}
+                  title="Google Search Grounding"
+                >
+                  <Globe size={13} className="mr-1" />
+                  Search
+                </button>
+              )}
             </div>
+
             <button
               type="button"
-              disabled={loading || !inputText.trim()}
+              disabled={loading || (!inputText.trim() && attachedImages.length === 0)}
               onClick={() => handleSendMessage()}
               className="flex h-7 w-7 items-center justify-center rounded-full bg-purple-600 text-white shadow-xs hover:bg-purple-700 disabled:opacity-40"
             >

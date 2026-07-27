@@ -15,6 +15,13 @@ export interface ChatWithOnlineAiOptions {
   messages: ChatMessage[];
   noteTitle?: string;
   noteContent?: string;
+  useSearchGrounding?: boolean;
+  images?: Array<{ data: string; mimeType: string }>;
+}
+
+export interface AiResponse {
+  text: string;
+  groundingMetadata?: any;
 }
 
 export function cleanAiMarkdown(text: string): string {
@@ -36,9 +43,10 @@ export function cleanAiMarkdown(text: string): string {
  * Helper to test current active AI provider connection
  */
 export async function testOnlineAiConnection(): Promise<string> {
-  return chatWithOnlineAi({
+  const res = await chatWithOnlineAi({
     messages: [{ role: "user", text: "Diga apenas a palavra 'OK' em maiúsculo para testar a conexão." }],
   });
+  return res.text;
 }
 
 /**
@@ -53,16 +61,17 @@ export async function askMark(options: AskMarkOptions): Promise<string> {
         ? "Melhore o estilo, a clareza e o tom do texto fornecido."
         : options.prompt;
 
-  return chatWithOnlineAi({
+  const res = await chatWithOnlineAi({
     messages: [{ role: "user", text: promptText }],
     noteContent: options.selectedText,
   });
+  return res.text;
 }
 
 /**
  * Universal Online AI Assistant Dispatcher
  */
-export async function chatWithOnlineAi(options: ChatWithOnlineAiOptions): Promise<string> {
+export async function chatWithOnlineAi(options: ChatWithOnlineAiOptions): Promise<AiResponse> {
   const store = useAiStore.getState();
   const provider = store.activeProvider;
 
@@ -76,22 +85,47 @@ ${options.noteContent || "(Nota Vazia)"}
 Por favor, responda à solicitação do usuário levando em conta este contexto da nota. Seja prestativo, claro e responda em Português do Brasil.\n\n`
     : "";
 
+  let resText = "";
+  let meta: any = null;
+
   switch (provider) {
     case "ollama_cloud":
-      return chatWithOllamaCloud(options.messages, contextHeader, store.ollamaCloudApiKey, store.ollamaCloudUrl, store.ollamaCloudModel);
-    case "gemini":
-      return chatWithGemini(options.messages, contextHeader, store.geminiApiKey, store.geminiModel);
+      resText = await chatWithOllamaCloud(options.messages, contextHeader, store.ollamaCloudApiKey, store.ollamaCloudUrl, store.ollamaCloudModel);
+      break;
+    case "gemini": {
+      const geminiRes = await chatWithGemini(
+        options.messages,
+        contextHeader,
+        store.geminiApiKey,
+        store.geminiModel,
+        options.useSearchGrounding,
+        options.images
+      );
+      if (typeof geminiRes === "string") {
+        resText = geminiRes;
+      } else {
+        resText = geminiRes.text;
+        meta = geminiRes.groundingMetadata;
+      }
+      break;
+    }
     case "groq":
-      return chatWithGroq(options.messages, contextHeader, store.groqApiKey, store.groqModel);
+      resText = await chatWithGroq(options.messages, contextHeader, store.groqApiKey, store.groqModel);
+      break;
     case "openai":
-      return chatWithOpenAi(options.messages, contextHeader, store.openaiApiKey, store.openaiModel);
+      resText = await chatWithOpenAi(options.messages, contextHeader, store.openaiApiKey, store.openaiModel);
+      break;
     case "claude":
-      return chatWithClaude(options.messages, contextHeader, store.claudeApiKey, store.claudeModel);
+      resText = await chatWithClaude(options.messages, contextHeader, store.claudeApiKey, store.claudeModel);
+      break;
     case "qwen":
-      return chatWithQwenCloud(options.messages, contextHeader, store.qwenApiKey, store.qwenModel);
+      resText = await chatWithQwenCloud(options.messages, contextHeader, store.qwenApiKey, store.qwenModel);
+      break;
     default:
       throw new Error("Provedor de IA Online inválido.");
   }
+
+  return { text: resText, groundingMetadata: meta };
 }
 
 /**
@@ -184,8 +218,10 @@ async function chatWithGemini(
   messages: ChatMessage[],
   contextHeader: string,
   apiKey: string,
-  model: string
-): Promise<string> {
+  model: string,
+  useSearchGrounding?: boolean,
+  images?: Array<{ data: string; mimeType: string }>
+): Promise<AiResponse | string> {
   const lastUserMsg = messages[messages.length - 1]?.text || "";
 
   // 1. Try server-side Gemini API route first (for web mode)
@@ -197,12 +233,19 @@ async function chatWithGemini(
         messages,
         prompt: lastUserMsg,
         noteTitle: contextHeader,
+        useSearchGrounding,
+        images,
       }),
     });
 
     if (res.ok) {
       const data = await res.json();
-      if (data.text) return data.text;
+      if (data.text) {
+        return {
+          text: data.text,
+          groundingMetadata: data.groundingMetadata,
+        };
+      }
     }
   } catch {
     // Expected on standalone desktop Tauri app
@@ -229,10 +272,30 @@ async function chatWithGemini(
   const systemPrompt = "Você é o Mark, assistente de IA no Markd. Responda em Português do Brasil.";
   const fullPrompt = `${systemPrompt}\n\n${contextHeader}Solicitação: ${lastUserMsg}`;
 
-  const contents = messages.map((m) => ({
+  const parts: any[] = [];
+  if (images && Array.isArray(images) && images.length > 0) {
+    for (const img of images) {
+      if (img.data && img.mimeType) {
+        parts.push({
+          inlineData: {
+            mimeType: img.mimeType,
+            data: img.data.replace(/^data:[^;]+;base64,/, ""),
+          },
+        });
+      }
+    }
+  }
+  parts.push({ text: fullPrompt });
+
+  const contents = messages.map((m, idx) => ({
     role: m.role === "user" ? "user" : "model",
-    parts: [{ text: m === messages[messages.length - 1] ? fullPrompt : m.text }],
+    parts: idx === messages.length - 1 ? parts : [{ text: m.text }],
   }));
+
+  const reqBody: any = { contents };
+  if (useSearchGrounding) {
+    reqBody.tools = [{ googleSearch: {} }];
+  }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${effectiveKey}`;
 
@@ -241,7 +304,7 @@ async function chatWithGemini(
     res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contents }),
+      body: JSON.stringify(reqBody),
     });
   } catch (err: any) {
     throw new Error(`Falha de rede ao conectar à API do Google Gemini: ${err.message || "Erro de conexão"}`);
@@ -260,12 +323,16 @@ async function chatWithGemini(
     throw new Error(`Erro no Google Gemini (HTTP ${res.status}): ${errorDetail}`);
   }
 
-  const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  const candidate = data.candidates?.[0];
+  const resultText = candidate?.content?.parts?.[0]?.text;
   if (!resultText) {
     throw new Error("O Google Gemini não retornou nenhum texto de resposta.");
   }
 
-  return resultText;
+  return {
+    text: resultText,
+    groundingMetadata: candidate?.groundingMetadata,
+  };
 }
 
 /**

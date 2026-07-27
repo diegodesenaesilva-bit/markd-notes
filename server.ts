@@ -20,7 +20,7 @@ const ai = new GoogleGenAI({
 
 app.post("/api/gemini/generate", async (req, res) => {
   try {
-    const { prompt, noteTitle, noteContent, action, messages } = req.body;
+    const { prompt, noteTitle, noteContent, action, messages, useSearchGrounding, images } = req.body;
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -31,7 +31,7 @@ app.post("/api/gemini/generate", async (req, res) => {
     }
 
     const systemInstruction =
-      "Você é o assistente de IA nativo do Markd (um aplicativo de notas local-first minimalista para macOS e Linux). Sua função é ajudar o usuário a escrever, analisar, resumir, expandir, organizar e extrair insights das notas. Responda em Português do Brasil com excelente clareza, tom útil e formatação Markdown limpa e bem estruturada.";
+      "Você é o Mark IA, o assistente inteligente nativo do Markd (um aplicativo de notas e produtividade local-first minimalista). Sua função é ajudar o usuário a escrever, analisar notas, escanear imagens e documentos, agendar compromissos, organizar tarefas e responder a dúvidas com dados atualizados da web. Responda em Português do Brasil com excelente clareza, tom útil e formatação Markdown limpa e bem estruturada.";
 
     let fullPrompt = "";
     if (noteTitle || noteContent) {
@@ -63,24 +63,95 @@ app.post("/api/gemini/generate", async (req, res) => {
     } else if (action === "explain") {
       fullPrompt += "Explique os principais conceitos, termos técnicos ou ideias discutidas nesta nota de forma didática e objetiva.";
     } else {
-      fullPrompt += prompt ? `Solicitação: ${prompt}` : "Análise esta nota e forneça insights e sugestões úteis.";
+      fullPrompt += prompt ? `Solicitação: ${prompt}` : "Analise esta nota e forneça insights e sugestões úteis.";
+    }
+
+    const parts: any[] = [];
+    if (images && Array.isArray(images) && images.length > 0) {
+      for (const img of images) {
+        if (img.data && img.mimeType) {
+          parts.push({
+            inlineData: {
+              mimeType: img.mimeType,
+              data: img.data.replace(/^data:[^;]+;base64,/, ""),
+            },
+          });
+        }
+      }
+    }
+    parts.push({ text: fullPrompt });
+
+    const config: any = {
+      systemInstruction,
+      temperature: 0.7,
+    };
+
+    if (useSearchGrounding) {
+      config.tools = [{ googleSearch: {} }];
     }
 
     const response = await ai.models.generateContent({
       model: "gemini-3.6-flash",
-      contents: fullPrompt,
-      config: {
-        systemInstruction,
-        temperature: 0.7,
-      },
+      contents: parts.length > 1 ? parts : fullPrompt,
+      config,
     });
 
-    res.json({ text: response.text || "Não foi possível gerar uma resposta." });
+    const candidate = response.candidates?.[0];
+    const groundingMetadata = candidate?.groundingMetadata;
+
+    res.json({
+      text: response.text || "Não foi possível gerar uma resposta.",
+      groundingMetadata: groundingMetadata || null,
+    });
   } catch (error: any) {
     console.error("[Gemini API Error]:", error);
     res.status(500).json({
       error: error?.message || "Ocorreu um erro ao comunicar com o Gemini.",
     });
+  }
+});
+
+app.post("/api/gemini/tts", async (req, res) => {
+  try {
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ error: "Texto necessário para síntese de voz." });
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return res.status(400).json({ error: "GEMINI_API_KEY não configurada no servidor." });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.1-flash-tts-preview",
+      contents: [{ parts: [{ text }] }],
+      config: {
+        responseModalities: ["AUDIO" as any],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: {
+              voiceName: "Kore",
+            },
+          },
+        },
+      } as any,
+    });
+
+    const candidate = response.candidates?.[0];
+    const audioPart = candidate?.content?.parts?.find((p: any) => p.inlineData && p.inlineData.mimeType?.startsWith("audio/"));
+
+    if (audioPart && audioPart.inlineData) {
+      return res.json({
+        audio: audioPart.inlineData.data,
+        mimeType: audioPart.inlineData.mimeType,
+      });
+    }
+
+    res.status(400).json({ error: "Áudio não retornado pela API de voz." });
+  } catch (error: any) {
+    console.error("[Gemini TTS Error]:", error);
+    res.status(500).json({ error: error?.message || "Erro ao sintetizar voz com Gemini TTS." });
   }
 });
 
