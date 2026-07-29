@@ -27,10 +27,18 @@ import {
   Columns2,
   Maximize2,
   Minimize2,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Baseline,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import { useState } from "react";
 import { BACKGROUND_COLORS, TEXT_COLORS } from "./textColors";
 import { useUi, type NoteWidth } from "@/stores/ui";
+import { FONT_OPTIONS, FONT_SIZES, ensureGoogleFont } from "@/lib/fonts";
+import { cx } from "@/lib/utils";
 
 interface EditorToolbarProps {
   editor: Editor;
@@ -53,8 +61,15 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   const [showColorPicker, setShowColorPicker] = useState<"text" | "background" | null>(null);
   const [showHeadings, setShowHeadings] = useState(false);
   const [showInsertMenu, setShowInsertMenu] = useState(false);
+  const [showFonts, setShowFonts] = useState(false);
+
   const noteWidth = useUi((s) => s.noteWidth);
   const cycleNoteWidth = useUi((s) => s.cycleNoteWidth);
+  const saveState = useUi((s) => s.saveState);
+  const noteFont = useUi((s) => s.noteFont);
+  const setNoteFont = useUi((s) => s.setNoteFont);
+  const noteFontSize = useUi((s) => s.noteFontSize);
+  const setNoteFontSize = useUi((s) => s.setNoteFontSize);
 
   if (!editor) return null;
 
@@ -67,15 +82,16 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
     : "Texto Normal";
 
   const WidthIcon = WIDTH_ICONS[noteWidth];
+  const activeFont = FONT_OPTIONS.find((f) => f.id === noteFont) || FONT_OPTIONS[0];
 
   return (
-    <div className="sticky top-0 z-20 flex flex-wrap items-center gap-0.5 border-b border-line bg-bg/95 px-2 py-1 backdrop-blur-md">
+    <div className="sticky top-0 z-20 flex flex-wrap items-center justify-center gap-0.5 border-b border-line bg-bg/95 px-2 py-1 backdrop-blur-md">
 
       {/* — Headings dropdown — */}
       <div className="relative">
         <button
           type="button"
-          onClick={() => { setShowHeadings(!showHeadings); setShowInsertMenu(false); setShowColorPicker(null); }}
+          onClick={() => { setShowHeadings(!showHeadings); setShowInsertMenu(false); setShowColorPicker(null); setShowFonts(false); }}
           className="flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-ink hover:bg-hover"
         >
           <Type size={13} />
@@ -103,6 +119,91 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
                 {item.icon} {item.label}
               </button>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* — Typography dropdown — */}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => {
+            setShowFonts(!showFonts);
+            setShowHeadings(false);
+            setShowInsertMenu(false);
+            setShowColorPicker(null);
+          }}
+          className="flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-ink hover:bg-hover transition-colors"
+          title="Fonte e Tipografia do Editor"
+        >
+          <Baseline size={13} className="text-muted" />
+          <span className="hidden md:inline max-w-[110px] truncate">{activeFont.name}</span>
+          <ChevronDown size={11} className="text-faint" />
+        </button>
+
+        {showFonts && (
+          <div
+            className="absolute left-0 top-full z-30 mt-1 w-64 rounded-xl border border-line bg-bg p-2 shadow-xl backdrop-blur-md"
+            onMouseLeave={() => setShowFonts(false)}
+          >
+            <div className="px-2 py-1 text-[10px] font-semibold text-faint uppercase tracking-wider">
+              Tipografia / Fonte
+            </div>
+            <div className="max-h-64 overflow-y-auto space-y-0.5 pr-0.5 no-scrollbar">
+              {FONT_OPTIONS.map((font) => {
+                ensureGoogleFont(font.id);
+                const isSelected = font.id === noteFont;
+                return (
+                  <button
+                    key={font.id}
+                    type="button"
+                    onClick={() => {
+                      setNoteFont(font.id);
+                      setShowFonts(false);
+                    }}
+                    className={cx(
+                      "flex w-full flex-col gap-0.5 rounded-lg px-2.5 py-1.5 text-left transition-colors",
+                      isSelected
+                        ? "bg-hover font-semibold text-ink"
+                        : "text-muted hover:bg-hover/70 hover:text-ink"
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs" style={{ fontFamily: font.fontFamily }}>
+                        {font.name}
+                      </span>
+                      {isSelected && <Check size={12} className="text-ink" />}
+                    </div>
+                    <span className="text-[10px] text-faint font-normal line-clamp-1">
+                      {font.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="my-1.5 h-px bg-line" />
+
+            <div className="px-2 py-1 text-[10px] font-semibold text-faint uppercase tracking-wider">
+              Tamanho do Texto
+            </div>
+            <div className="grid grid-cols-4 gap-1 px-1">
+              {FONT_SIZES.map((size) => (
+                <button
+                  key={size.value}
+                  type="button"
+                  onClick={() => setNoteFontSize(size.value)}
+                  className={cx(
+                    "rounded-md py-1 text-[11px] font-medium transition-colors text-center",
+                    noteFontSize === size.value
+                      ? "bg-invert text-invert-ink font-semibold"
+                      : "bg-panel text-muted hover:text-ink hover:bg-hover"
+                  )}
+                >
+                  {size.value}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -139,7 +240,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <div className="relative">
         <button
           type="button"
-          onClick={() => { setShowInsertMenu(!showInsertMenu); setShowHeadings(false); setShowColorPicker(null); }}
+          onClick={() => { setShowInsertMenu(!showInsertMenu); setShowHeadings(false); setShowColorPicker(null); setShowFonts(false); }}
           className="flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-muted hover:bg-hover hover:text-ink"
           title="Inserir"
         >
@@ -203,7 +304,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
       <div className="relative flex items-center gap-0.5">
         <Btn
           active={Boolean(editor.getAttributes("textStyle").color)}
-          onClick={() => { setShowColorPicker(showColorPicker === "text" ? null : "text"); setShowInsertMenu(false); setShowHeadings(false); }}
+          onClick={() => { setShowColorPicker(showColorPicker === "text" ? null : "text"); setShowInsertMenu(false); setShowHeadings(false); setShowFonts(false); }}
           title="Cor do Texto"
         >
           <Palette size={13} />
@@ -241,6 +342,35 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
         <WidthIcon size={13} />
       </Btn>
 
+      {/* — Save Status Badge — */}
+      <div className="mx-0.5 h-4 w-px bg-line" />
+      <div
+        className="flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-medium transition-all duration-200 select-none"
+        title={
+          saveState === "saving"
+            ? "Salvando alterações no disco..."
+            : saveState === "error"
+            ? "Erro ao salvar nota"
+            : "Todas as alterações foram salvas"
+        }
+      >
+        {saveState === "saving" ? (
+          <>
+            <Loader2 size={12} className="animate-spin text-amber-500 dark:text-amber-400" />
+            <span className="text-amber-600 dark:text-amber-400 font-medium">Salvando...</span>
+          </>
+        ) : saveState === "error" ? (
+          <>
+            <AlertCircle size={12} className="text-danger" />
+            <span className="text-danger font-medium">Erro ao salvar</span>
+          </>
+        ) : (
+          <>
+            <CheckCircle2 size={12} className="text-emerald-600 dark:text-emerald-400" />
+            <span className="text-faint hover:text-muted transition-colors">Salvo</span>
+          </>
+        )}
+      </div>
 
     </div>
   );

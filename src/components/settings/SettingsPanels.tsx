@@ -25,6 +25,7 @@ import { useShortcuts } from "@/stores/shortcuts";
 import { useUi } from "@/stores/ui";
 import { useUpdater } from "@/stores/updater";
 import { useVault } from "@/stores/vault";
+import { FONT_OPTIONS, FONT_SIZES, ensureGoogleFont } from "@/lib/fonts";
 
 const THEMES: Array<{
   value: Theme;
@@ -307,54 +308,125 @@ export function GeneralSettings() {
   );
 }
 
+
 export function AppearanceSettings() {
   const theme = useVault((state) => state.theme);
   const setTheme = useVault((state) => state.setTheme);
   const mac = isMac();
   const cycleTheme = useShortcuts((state) => state.bindings.cycleTheme);
 
+  const noteFont = useUi((state) => state.noteFont);
+  const setNoteFont = useUi((state) => state.setNoteFont);
+  const noteFontSize = useUi((state) => state.noteFontSize);
+  const setNoteFontSize = useUi((state) => state.setNoteFontSize);
+
   return (
-    <SettingsGroup
-      title="Theme"
-      description="Choose how Markd looks across the editor and navigation."
-      aside={
-        <span className="flex items-center text-[10.5px] text-faint">
-          <ShortcutKeys shortcut={cycleTheme} mac={mac} />
-          <span className="ml-1.5">to cycle</span>
-        </span>
-      }
-    >
-      <div role="group" aria-label="Theme" className="grid grid-cols-3 gap-2">
-        {THEMES.map(({ value, label, description, icon: Icon }) => {
-          const active = theme === value;
-          return (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={active}
-              onClick={() => setTheme(value)}
-              className={cx(
-                "flex min-h-24 flex-col items-start rounded-xl p-3 text-left transition-colors duration-100",
-                active
-                  ? "bg-invert text-invert-ink"
-                  : "bg-panel text-muted hover:bg-hover hover:text-ink",
-              )}
-            >
-              <Icon size={17} strokeWidth={1.7} />
-              <span className="mt-auto text-[12.5px] font-semibold">{label}</span>
-              <span
+    <div className="space-y-6">
+      <SettingsGroup
+        title="Theme"
+        description="Choose how Markd looks across the editor and navigation."
+        aside={
+          <span className="flex items-center text-[10.5px] text-faint">
+            <ShortcutKeys shortcut={cycleTheme} mac={mac} />
+            <span className="ml-1.5">to cycle</span>
+          </span>
+        }
+      >
+        <div role="group" aria-label="Theme" className="grid grid-cols-3 gap-2">
+          {THEMES.map(({ value, label, description, icon: Icon }) => {
+            const active = theme === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setTheme(value)}
                 className={cx(
-                  "mt-0.5 text-[10.5px]",
-                  active ? "text-invert-ink/65" : "text-faint",
+                  "flex min-h-24 flex-col items-start rounded-xl p-3 text-left transition-colors duration-100",
+                  active
+                    ? "bg-invert text-invert-ink"
+                    : "bg-panel text-muted hover:bg-hover hover:text-ink",
                 )}
               >
-                {description}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </SettingsGroup>
+                <Icon size={17} strokeWidth={1.7} />
+                <span className="mt-auto text-[12.5px] font-semibold">{label}</span>
+                <span
+                  className={cx(
+                    "mt-0.5 text-[10.5px]",
+                    active ? "text-invert-ink/65" : "text-faint",
+                  )}
+                >
+                  {description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </SettingsGroup>
+
+      <SettingsGroup
+        title="Tamanho do Texto (Font Size)"
+        description="Ajuste o tamanho do texto para a leitura e edição das suas notas."
+      >
+        <div role="group" aria-label="Font Size" className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {FONT_SIZES.map((size) => {
+            const active = noteFontSize === size.value;
+            return (
+              <button
+                key={size.value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setNoteFontSize(size.value)}
+                className={cx(
+                  "flex flex-col items-center justify-center rounded-xl p-3 text-center transition-colors duration-100 border",
+                  active
+                    ? "bg-invert text-invert-ink border-transparent font-semibold shadow-xs"
+                    : "bg-panel text-muted border-line-soft hover:bg-hover hover:text-ink"
+                )}
+              >
+                <span className="text-[13px] font-semibold">{size.label}</span>
+                <span className={cx("mt-0.5 text-[10.5px]", active ? "text-invert-ink/70" : "text-faint")}>
+                  {size.value}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </SettingsGroup>
+
+      <SettingsGroup
+        title="Tipografia das Notas (Editor Font)"
+        description="Escolha a família de fonte para personalizar a escrita."
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+          {FONT_OPTIONS.map((font) => {
+            ensureGoogleFont(font.id);
+            const active = noteFont === font.id;
+            return (
+              <button
+                key={font.id}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setNoteFont(font.id)}
+                className={cx(
+                  "flex flex-col items-start rounded-xl p-2.5 text-left transition-colors duration-100 border",
+                  active
+                    ? "bg-invert text-invert-ink border-transparent font-semibold"
+                    : "bg-panel text-muted border-line-soft hover:bg-hover hover:text-ink"
+                )}
+              >
+                <span className="text-[13px]" style={{ fontFamily: font.fontFamily }}>
+                  {font.name}
+                </span>
+                <span className={cx("mt-0.5 text-[10.5px] line-clamp-1", active ? "text-invert-ink/70" : "text-faint")}>
+                  {font.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </SettingsGroup>
+    </div>
   );
 }
 

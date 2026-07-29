@@ -38,6 +38,7 @@ import { useNoteFindReplace } from "./useNoteFindReplace";
 import { EditorToolbar } from "./EditorToolbar";
 import { TableToolbar } from "./TableToolbar";
 import { cleanAiMarkdown } from "@/lib/ai";
+import { ensureGoogleFont } from "@/lib/fonts";
 
 const MarkdownSourceEditor = lazy(() =>
   import("./MarkdownSourceEditor").then((module) => ({
@@ -801,6 +802,10 @@ export const NoteEditor = memo(function NoteEditor({
     setLinkPicker(null);
   };
 
+  const noteFont = useUi((s) => s.noteFont);
+  const noteFontSize = useUi((s) => s.noteFontSize);
+  const currentFontOption = useMemo(() => ensureGoogleFont(noteFont), [noteFont]);
+
   const handleInsertAiResult = (resultText: string, replaceSelection: boolean) => {
     if (!editor) return;
     const cleanedText = cleanAiMarkdown(resultText);
@@ -892,7 +897,9 @@ export const NoteEditor = memo(function NoteEditor({
                   onUpsert={upsertProperty}
                   onRemove={removeProperty}
                 />
-                <EditorContent editor={editor} />
+                <div style={{ fontFamily: currentFontOption.fontFamily, fontSize: noteFontSize }}>
+                  <EditorContent editor={editor} />
+                </div>
               </>
             )}
           </div>

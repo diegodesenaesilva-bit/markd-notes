@@ -12,12 +12,6 @@ if (!/^\d+\.\d+\.\d+$/.test(expectedVersion ?? "")) {
   process.exit(1);
 }
 
-// Auto-sync versions first to ensure all 6 config files match tauri.conf.json
-try {
-  const { execSync } = await import("node:child_process");
-  execSync("node scripts/sync-version.js", { cwd: projectRoot, stdio: "ignore" });
-} catch {}
-
 const readJson = (path) => JSON.parse(readFileSync(join(projectRoot, path), "utf8"));
 const versions = new Map([
   ["package.json", readJson("package.json").version],

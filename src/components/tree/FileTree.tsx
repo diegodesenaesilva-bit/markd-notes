@@ -206,7 +206,7 @@ function TreeList({
   showEmpty: boolean;
 }) {
   const eligible = Boolean(dragging && parentDir(dragging) !== "");
-  const { setNodeRef } = useDroppable({
+  const { isOver: isRootOver, setNodeRef } = useDroppable({
     id: ROOT_DROP_ID,
     disabled: !eligible,
     data: { dir: "" },
@@ -218,8 +218,16 @@ function TreeList({
       data-note-tree
       role="tree"
       aria-label="Notes"
-      className="no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-2 pb-6 pt-1"
+      className={cx(
+        "no-scrollbar relative min-h-0 flex-1 overflow-y-auto px-2 pb-6 pt-1 transition-all duration-150 rounded-lg",
+        isRootOver && "bg-hover/60 ring-2 ring-dashed ring-line-strong"
+      )}
     >
+      {isRootOver && (
+        <div className="mb-1.5 rounded-md border border-dashed border-line bg-panel px-2.5 py-1 text-[11px] font-medium text-ink flex items-center justify-center gap-1.5 shadow-xs">
+          <span>Solte para mover para a raiz do Vault</span>
+        </div>
+      )}
       {tree.map((node) => (
         <Row key={node.rel} node={node} depth={0} />
       ))}
@@ -273,6 +281,18 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
     [setDragRef, setDropRef],
   );
 
+  const isDropTarget = isOver && !isDragging && !invalidTarget;
+
+  // Auto-expand closed folder when dragging an item over it
+  useEffect(() => {
+    if (isOver && isFolder && !isOpen && api?.dragging && !invalidTarget) {
+      const timer = setTimeout(() => {
+        toggleExpanded(node.rel);
+      }, 550);
+      return () => clearTimeout(timer);
+    }
+  }, [isOver, isFolder, isOpen, api?.dragging, invalidTarget, node.rel, toggleExpanded]);
+
   return (
     <>
       <div
@@ -284,12 +304,12 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
         aria-expanded={isFolder ? isOpen : undefined}
         tabIndex={api?.focusRel === node.rel ? 0 : -1}
         className={cx(
-          "group relative flex h-[30px] touch-none cursor-pointer items-center rounded-md pr-1.5 text-[13px] transition-colors duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink",
+          "group relative flex h-[30px] touch-none cursor-pointer items-center rounded-md pr-1.5 text-[13px] transition-all duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink",
           isActive
             ? "bg-active text-ink"
             : "text-muted hover:bg-hover hover:text-ink",
-          isOver && !isActive && "bg-active text-ink",
-          isDragging && "opacity-40",
+          isDropTarget && "bg-hover text-ink ring-1 ring-ink/40 font-medium scale-[1.005]",
+          isDragging && "opacity-30 border border-dashed border-line",
         )}
         style={{
           paddingLeft: 16 + depth * 14,

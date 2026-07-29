@@ -22,6 +22,8 @@ interface UiState {
   markdownSource: boolean;
   saveState: SaveState;
   noteWidth: NoteWidth;
+  noteFont: string;
+  noteFontSize: string;
   setPaletteOpen: (open: boolean) => void;
   setSettingsOpen: (open: boolean) => void;
   openSettings: (page?: SettingsPage) => void;
@@ -43,6 +45,8 @@ interface UiState {
   toggleMarkdownSource: () => void;
   setSaveState: (state: SaveState) => void;
   cycleNoteWidth: () => void;
+  setNoteFont: (font: string) => void;
+  setNoteFontSize: (size: string) => void;
 }
 
 export const useUi = create<UiState>((set, get) => ({
@@ -61,6 +65,8 @@ export const useUi = create<UiState>((set, get) => ({
   markdownSource: false,
   saveState: "idle",
   noteWidth: "normal",
+  noteFont: typeof window !== "undefined" ? localStorage.getItem("markd_editor_font") || "inter" : "inter",
+  noteFontSize: typeof window !== "undefined" ? localStorage.getItem("markd_editor_font_size") || "16px" : "16px",
   setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   openSettings: (settingsPage = "general") =>
@@ -122,5 +128,17 @@ export const useUi = create<UiState>((set, get) => ({
     const current = get().noteWidth;
     const next = order[(order.indexOf(current) + 1) % order.length];
     set({ noteWidth: next });
+  },
+  setNoteFont: (noteFont) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("markd_editor_font", noteFont);
+    }
+    set({ noteFont });
+  },
+  setNoteFontSize: (noteFontSize) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("markd_editor_font_size", noteFontSize);
+    }
+    set({ noteFontSize });
   },
 }));
