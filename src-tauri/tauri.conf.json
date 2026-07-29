@@ -105,9 +105,10 @@
   "plugins": {
     "updater": {
       "active": true,
-      "endpoints": ["https://usemarkd.app/updates/latest.json"],
-      "dialog": false,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI1NTc1QTg3M0ZEMEZCRTMKUldUais5QS9oMXBYdGRxUWpRYW1IZ0hCbGxhbVdObjkyRVh5NVhWYTZEanVYbUVlaGRrb3hKQ2cK"
+      "endpoints": [
+        "https://github.com/diegodesenaesilva-bit/markd-notes/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmFzaWduIHB1YmxpYyBrZXk6IEEwRDM1NzE5MUYwMTM4MDkKUldTZUNSdzlVclcyNDlrdjcyS2FwZjdzUXRwbkF4bEFsODVsZmsyaTFlaXNlSEhPcFJvdHRnTHQK"
     }
   }
 }

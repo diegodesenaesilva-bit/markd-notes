@@ -10,7 +10,11 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "0.1.6",
+<<<<<<< HEAD
+    version: "0.3.7",
+=======
+    version: "0.3.7",
+>>>>>>> a971586 (fix: re-apply universal self-healing auto-sync scripts to fix v0.3.7 release build)
     date: "2026-07-21",
     displayDate: "July 21, 2026",
     title: "Publish and stay in control",
