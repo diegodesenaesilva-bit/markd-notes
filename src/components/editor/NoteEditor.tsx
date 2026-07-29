@@ -75,6 +75,48 @@ export const NoteEditor = memo(function NoteEditor({
   const [slashMenu, setSlashMenu] = useState<SlashMenuState | null>(null);
   const [linkPicker, setLinkPicker] = useState<LinkPickerState | null>(null);
   const [words, setWords] = useState(0);
+  const [chars, setChars] = useState(0);
+  const [charsNoSpaces, setCharsNoSpaces] = useState(0);
+  const [selectionStats, setSelectionStats] = useState<{
+    words: number;
+    chars: number;
+    charsNoSpaces: number;
+  } | null>(null);
+
+  const updateSelectionStats = useCallback((ed: EditorInstance) => {
+    if (!ed) return;
+    const { selection, doc } = ed.state;
+    if (!selection || selection.empty || selection.from === selection.to) {
+      setSelectionStats(null);
+      return;
+    }
+    try {
+      const text = doc.textBetween(selection.from, selection.to, " ", " ");
+      if (!text) {
+        setSelectionStats(null);
+        return;
+      }
+      setSelectionStats({
+        words: countWords(text),
+        chars: countChars(text),
+        charsNoSpaces: countCharsNoSpaces(text),
+      });
+    } catch {
+      setSelectionStats(null);
+    }
+  }, []);
+
+  const handleSourceSelectionChange = useCallback((text: string) => {
+    if (!text) {
+      setSelectionStats(null);
+    } else {
+      setSelectionStats({
+        words: countWords(text),
+        chars: countChars(text),
+        charsNoSpaces: countCharsNoSpaces(text),
+      });
+    }
+  }, []);
   const [missing, setMissing] = useState(false);
   const [properties, setProperties] = useState<Property[]>([]);
   const [propertyAddRequest, setPropertyAddRequest] = useState(0);
@@ -343,14 +385,18 @@ export const NoteEditor = memo(function NoteEditor({
         setSaveState("saving");
         debouncedPersist(markdown);
         setWords(countWords(markdown));
+        setChars(countChars(markdown));
+        setCharsNoSpaces(countCharsNoSpaces(markdown));
         setContentVersion((value) => value + 1);
         updateSlashMenu(editor);
+        updateSelectionStats(editor);
       },
       onSelectionUpdate({ editor }) {
         updateSlashMenu(editor);
+        updateSelectionStats(editor);
       },
     },
-    [extensions],
+    [extensions, updateSelectionStats],
   );
   editorRef.current = editor;
 
@@ -364,6 +410,8 @@ export const NoteEditor = memo(function NoteEditor({
       setSaveState("saving");
       debouncedPersist(body);
       setWords(countWords(body));
+      setChars(countChars(body));
+      setCharsNoSpaces(countCharsNoSpaces(body));
       setContentVersion((value) => value + 1);
     },
     [debouncedPersist, setSaveState],
@@ -450,6 +498,9 @@ export const NoteEditor = memo(function NoteEditor({
         swapping.current = false;
         setLoadNonce((value) => value + 1);
         setWords(countWords(body));
+        setChars(countChars(body));
+        setCharsNoSpaces(countCharsNoSpaces(body));
+        setSelectionStats(null);
         // A freshly loaded note starts at the top.
         savedScroll.current = 0;
         if (scrollRef.current) scrollRef.current.scrollTop = 0;
@@ -523,6 +574,8 @@ export const NoteEditor = memo(function NoteEditor({
         swapping.current = false;
         setLoadNonce((value) => value + 1);
         setWords(countWords(body));
+        setChars(countChars(body));
+        setCharsNoSpaces(countCharsNoSpaces(body));
       }
     } catch {
       // note may have been deleted externally; tree refresh handles it
@@ -826,6 +879,7 @@ export const NoteEditor = memo(function NoteEditor({
                 <MarkdownSourceEditor
                   value={rawText}
                   onChange={applyRawTextChange}
+                  onSelectionChange={handleSourceSelectionChange}
                   selection={noteFind.sourceSelection}
                 />
               </Suspense>
@@ -868,17 +922,43 @@ export const NoteEditor = memo(function NoteEditor({
             />
           )}
         </div>
-        {active && (
-          <div
-            className={cx(
-              "pointer-events-none absolute bottom-3 right-4 text-[11px] tabular-nums text-faint transition-opacity duration-300",
-              (words === 0 || missing) && "opacity-0",
-            )}
-          >
-            {words} {words === 1 ? "word" : "words"}
-          </div>
-        )}
       </div>
+      {active && !missing && (
+        <div className="pointer-events-none absolute bottom-3 right-4 z-20 flex items-center gap-1.5 rounded-md bg-panel/80 px-2.5 py-1 text-[11px] font-medium text-faint border border-line/40 shadow-xs backdrop-blur-xs select-none tabular-nums transition-opacity duration-200">
+          {selectionStats ? (
+            <>
+              <span>
+                {selectionStats.words}{" "}
+                {selectionStats.words === 1
+                  ? "palavra selecionada"
+                  : "palavras selecionadas"}
+              </span>
+              <span className="text-line/60">·</span>
+              <span className="text-[10px] text-faint/80">
+                {selectionStats.chars} com espaços
+              </span>
+              <span className="text-line/60">·</span>
+              <span className="text-[10px] text-faint/80">
+                {selectionStats.charsNoSpaces} sem espaços
+              </span>
+            </>
+          ) : (
+            <>
+              <span>
+                {words} {words === 1 ? "palavra" : "palavras"}
+              </span>
+              <span className="text-line/60">·</span>
+              <span className="text-[10px] text-faint/80">
+                {chars} com espaços
+              </span>
+              <span className="text-line/60">·</span>
+              <span className="text-[10px] text-faint/80">
+                {charsNoSpaces} sem espaços
+              </span>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 });
@@ -888,4 +968,12 @@ type EditorInstance = ReturnType<typeof useEditor>;
 function countWords(markdown: string) {
   const text = markdown.trim();
   return text ? text.split(/\s+/).filter(Boolean).length : 0;
+}
+
+function countChars(markdown: string) {
+  return markdown.length;
+}
+
+function countCharsNoSpaces(markdown: string) {
+  return markdown.replace(/\s/g, "").length;
 }

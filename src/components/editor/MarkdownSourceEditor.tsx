@@ -59,10 +59,12 @@ const markdHighlight = HighlightStyle.define([
 export function MarkdownSourceEditor({
   value,
   onChange,
+  onSelectionChange,
   selection,
 }: {
   value: string;
   onChange: (value: string) => void;
+  onSelectionChange?: (text: string) => void;
   selection?: { from: number; to: number; nonce: number } | null;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -70,6 +72,8 @@ export function MarkdownSourceEditor({
   const syncingRef = useRef(false);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  onSelectionChangeRef.current = onSelectionChange;
 
   useEffect(() => {
     if (!hostRef.current) return;
@@ -91,6 +95,13 @@ export function MarkdownSourceEditor({
           EditorView.updateListener.of((update) => {
             if (update.docChanged && !syncingRef.current) {
               onChangeRef.current(update.state.doc.toString());
+            }
+            if (update.selectionSet || update.docChanged) {
+              const mainRange = update.state.selection.main;
+              const selectedText = mainRange.empty
+                ? ""
+                : update.state.sliceDoc(mainRange.from, mainRange.to);
+              onSelectionChangeRef.current?.(selectedText);
             }
           }),
         ],
