@@ -120,7 +120,7 @@ function syncVersions() {
     }
   }
 
-  // File 2: Cargo.toml
+  // File 2: Cargo.toml & Cargo.lock
   const cargoTomlPath = join(projectRoot, "src-tauri", "Cargo.toml");
   if (existsSync(cargoTomlPath)) {
     let cargo = readFileSync(cargoTomlPath, "utf-8");
@@ -130,6 +130,19 @@ function syncVersions() {
       if (newCargo !== cargo) {
         writeFileSync(cargoTomlPath, newCargo, "utf-8");
         log("✓", `Synced Cargo.toml → ${version}`);
+      }
+    }
+  }
+
+  const cargoLockPath = join(projectRoot, "src-tauri", "Cargo.lock");
+  if (existsSync(cargoLockPath)) {
+    let lock = readFileSync(cargoLockPath, "utf-8");
+    const lockRegex = /(\[\[package\]\]\r?\nname\s*=\s*"Markd"\r?\nversion\s*=\s*")[^"]+(")/;
+    if (lockRegex.test(lock)) {
+      const newLock = lock.replace(lockRegex, `$1${version}$2`);
+      if (newLock !== lock) {
+        writeFileSync(cargoLockPath, newLock, "utf-8");
+        log("✓", `Synced Cargo.lock → ${version}`);
       }
     }
   }
