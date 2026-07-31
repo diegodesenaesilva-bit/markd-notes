@@ -11,7 +11,7 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
 <<<<<<< HEAD
-    version: "0.3.14",
+    version: "0.3.15",
 =======
     version: "0.3.7",
 >>>>>>> a971586 (fix: re-apply universal self-healing auto-sync scripts to fix v0.3.7 release build)
