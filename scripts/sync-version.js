@@ -87,6 +87,8 @@ function syncVersions() {
   const conf = readJsonFile(tauriConfPath);
   
   // Sanitize updater
+  if (!conf.bundle) conf.bundle = {};
+  conf.bundle.createUpdaterArtifacts = true;
   if (!conf.plugins) conf.plugins = {};
   if (!conf.plugins.updater) conf.plugins.updater = {};
   if (conf.plugins.updater.pubkey !== CORRECT_PUBKEY) conf.plugins.updater.pubkey = CORRECT_PUBKEY;
