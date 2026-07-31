@@ -12,6 +12,7 @@ import {
   PinOff,
   Pilcrow,
   PenTool,
+  Wand2,
   Search,
   Tag,
   Trash2,
@@ -52,6 +53,7 @@ import { useBookmarks } from "@/stores/bookmarks";
 import { useTodos } from "@/stores/todos";
 import { usePins } from "@/stores/pins";
 import { useUi } from "@/stores/ui";
+import { useCopilot } from "@/stores/copilot";
 import { useVault } from "@/stores/vault";
 
 const SIDEBAR_WIDTH = 240;
@@ -80,6 +82,10 @@ export function AppShell() {
   const toggleBacklinks = useUi((s) => s.toggleBacklinks);
   const openRightPanel = useUi((s) => s.openRightPanel);
   const toggleMarkdownSource = useUi((s) => s.toggleMarkdownSource);
+
+  const copilotMode = useCopilot((s) => s.copilotMode);
+  const setCopilotMode = useCopilot((s) => s.setCopilotMode);
+  const inlineComments = useCopilot((s) => s.inlineComments);
   const createBookmarkTag = useBookmarks((s) => s.createTag);
   const exportBookmarks = useBookmarks((s) => s.exportAll);
   const createTodoTag = useTodos((s) => s.createTag);
@@ -165,11 +171,38 @@ export function AppShell() {
                   <Tooltip label="Peça ao Gemini (Assistente Gemini IA)" side="bottom">
                     <button
                       type="button"
-                      onClick={() => openRightPanel("mark")}
+                      onClick={() => {
+                        openRightPanel("mark");
+                        setCopilotMode(false);
+                      }}
                       className="inline-flex h-7 select-none items-center gap-1.5 rounded-md border border-purple-500/30 bg-purple-500/10 px-2.5 text-[12.5px] font-medium text-purple-600 dark:text-purple-400 transition-colors duration-100 hover:bg-purple-500/20 active:scale-[0.98]"
                     >
                       <GeminiIcon size={13} />
                       <span>Peça ao Gemini</span>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip label="Modo Copiloto (Revisão & Edição Direta da Nota)" side="bottom">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openRightPanel("mark");
+                        setCopilotMode(true);
+                      }}
+                      className={cx(
+                        "inline-flex h-7 select-none items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] font-medium transition-colors duration-100 active:scale-[0.98]",
+                        copilotMode
+                          ? "border-purple-600 bg-purple-600 text-white shadow-xs"
+                          : "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20"
+                      )}
+                    >
+                      <Wand2 size={13} />
+                      <span>Modo Copiloto</span>
+                      {inlineComments.length > 0 && (
+                        <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-purple-400 px-1 text-[10px] font-bold text-slate-950">
+                          {inlineComments.length}
+                        </span>
+                      )}
                     </button>
                   </Tooltip>
 

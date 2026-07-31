@@ -21,12 +21,14 @@ import {
   ExternalLink,
   RotateCcw,
   Wand2,
+  MessageSquarePlus,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
 import { chatWithOnlineAi, cleanAiMarkdown, type ChatMessage } from "@/lib/ai";
 import { useAiStore } from "@/stores/ai";
 import { useUi } from "@/stores/ui";
+import { useCopilot } from "@/stores/copilot";
 import { useVault } from "@/stores/vault";
 import { useCalendar } from "@/stores/calendar";
 import { useTodos } from "@/stores/todos";
@@ -84,9 +86,15 @@ export function AskMarkSidebar({
   const [isListening, setIsListening] = useState(false);
   const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
 
-  // Copilot Mode State
-  const [copilotMode, setCopilotMode] = useState(true);
-  const [autoApplyCopilot, setAutoApplyCopilot] = useState(false);
+  // Copilot Mode State from Zustand Store
+  const copilotMode = useCopilot((s) => s.copilotMode);
+  const setCopilotMode = useCopilot((s) => s.setCopilotMode);
+  const autoApplyCopilot = useCopilot((s) => s.autoApplyCopilot);
+  const setAutoApplyCopilot = useCopilot((s) => s.setAutoApplyCopilot);
+  const inlineComments = useCopilot((s) => s.inlineComments);
+  const removeInlineComment = useCopilot((s) => s.removeInlineComment);
+  const clearInlineComments = useCopilot((s) => s.clearInlineComments);
+
   const [expandedPreviewIndex, setExpandedPreviewIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -566,10 +574,11 @@ ${noteContent || "(Nota Vazia)"}
 ${
   copilotMode
     ? `[MODO COPILOTO DE EDIÇÃO DA NOTA ATIVO]:
-Você está operando como um Copiloto Direto de Edição de Texto no Markd.
+Você está operando como um Copiloto Direto de Edição de Texto no Markd (estilo Google Antigravity).
 Sua missão:
-1. Responda amigavelmente no chat explicando o que você analisou, revisou ou reescreveu ("avisando no chat o que está sendo feito").
-2. Se a solicitação do usuário envolver reescrever, melhorar, aplicar um comentário, organizar, resumir, corrigir gramática ou fazer qualquer alteração no texto da nota, COLOQUE OBRIGATORIAMENTE ao final da sua resposta um bloco de código JSON com a ação "update_active_note":
+1. Responda amigavelmente no chat com um resumo explicativo do que foi alterado ou corrigido.
+2. Junte todos os comentários específicos deixados em trechos da nota + a instrução geral do chat e execute as modificações.
+3. COLOQUE OBRIGATORIAMENTE ao final da sua resposta um bloco de código JSON com a ação "update_active_note":
 \`\`\`json
 {
   "action": "update_active_note",
@@ -578,6 +587,18 @@ Sua missão:
 }
 \`\`\`
 Preserve o formato Markdown da nota e mantenha os títulos e estrutura não afetados pela alteração.
+${
+  inlineComments.length > 0
+    ? `\n[COMENTÁRIOS E INSTRUÇÕES ESPECÍFICAS DEIXADAS PELO USUÁRIO EM TRECHOS DA NOTA]:\n` +
+      inlineComments
+        .map(
+          (c, idx) =>
+            `${idx + 1}. Trecho da Nota: "${c.selectedText}"\n   Instrução/Comentário: "${c.comment}"`
+        )
+        .join("\n\n") +
+      `\n\nPor favor, execute rigorosamente cada uma das alterações solicitadas nos trechos acima.`
+    : ""
+}
 `
     : ""
 }
@@ -610,6 +631,10 @@ Preserve o formato Markdown da nota e mantenha os títulos e estrutura não afet
           proposedNoteUpdate: proposedUpdate,
         },
       ]);
+
+      if (inlineComments.length > 0) {
+        clearInlineComments();
+      }
     } catch (err: any) {
       setError(err.message || `Erro na comunicação com a IA.`);
     } finally {
@@ -1175,6 +1200,69 @@ Preserve o formato Markdown da nota e mantenha os títulos e estrutura não afet
 
       {/* Input Bar */}
       <div className="border-t border-line bg-panel/30 p-3 space-y-2">
+        {copilotMode && inlineComments.length > 0 && currentViewType === "note" && (
+          <div className="flex flex-col gap-2 rounded-xl border border-purple-500/40 bg-purple-500/10 p-3 text-xs text-ink shadow-2xs">
+            <div className="flex items-center justify-between font-semibold text-purple-600 dark:text-purple-400">
+              <span className="flex items-center gap-1.5">
+                <MessageSquarePlus size={14} />
+                <span>
+                  {inlineComments.length}{" "}
+                  {inlineComments.length === 1
+                    ? "Comentário no Trecho"
+                    : "Comentários em Trechos da Nota"}
+                </span>
+              </span>
+              <button
+                type="button"
+                onClick={() => clearInlineComments()}
+                className="text-[10.5px] text-faint hover:text-danger transition-colors font-normal"
+              >
+                Limpar comentários
+              </button>
+            </div>
+
+            <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
+              {inlineComments.map((c) => (
+                <div
+                  key={c.id}
+                  className="group flex items-start justify-between gap-2 rounded-lg bg-bg/90 p-2 border border-line-soft text-xs shadow-2xs"
+                >
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="text-[10.5px] font-mono text-faint truncate italic">
+                      "{c.selectedText}"
+                    </div>
+                    <div className="font-medium text-ink leading-snug">
+                      {c.comment}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeInlineComment(c.id)}
+                    className="text-faint hover:text-danger opacity-60 group-hover:opacity-100 p-0.5 transition-opacity"
+                    title="Remover este comentário"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                handleSendMessage(
+                  inputText.trim() ||
+                    "Aplique todos os comentários e edições em trechos especificadas na nota."
+                )
+              }
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-purple-600 px-3 py-2 text-xs font-semibold text-white shadow-xs hover:bg-purple-700 transition-colors"
+            >
+              <Wand2 size={13} />
+              <span>Prosseguir & Processar Nota ({inlineComments.length})</span>
+            </button>
+          </div>
+        )}
+
         {selectedText && currentViewType === "note" && (
           <div className="flex flex-col gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 p-2.5 text-xs text-ink shadow-2xs">
             <div className="flex items-center justify-between text-[11px] font-semibold text-purple-600 dark:text-purple-400">

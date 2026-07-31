@@ -37,6 +37,7 @@ import { TitleInput } from "./TitleInput";
 import { useNoteFindReplace } from "./useNoteFindReplace";
 import { EditorToolbar } from "./EditorToolbar";
 import { TableToolbar } from "./TableToolbar";
+import { CopilotCommentPopover } from "./CopilotCommentPopover";
 import { cleanAiMarkdown } from "@/lib/ai";
 import { ensureGoogleFont } from "@/lib/fonts";
 
@@ -955,6 +956,9 @@ export const NoteEditor = memo(function NoteEditor({
               onPick={insertNoteLink}
               onClose={() => setLinkPicker(null)}
             />
+          )}
+          {active && !markdownSource && (
+            <CopilotCommentPopover editor={editor} active={active} />
           )}
         </div>
       </div>

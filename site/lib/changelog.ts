@@ -11,7 +11,11 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
 <<<<<<< HEAD
-    version: "0.3.15",
+<<<<<<< HEAD
+    version: "0.3.16",
+=======
+    version: "0.3.16",
+>>>>>>> a3be5c7 (feat(copilot): implement Copilot mode, inline comments, and update version to 0.3.16)
 =======
     version: "0.3.7",
 >>>>>>> a971586 (fix: re-apply universal self-healing auto-sync scripts to fix v0.3.7 release build)

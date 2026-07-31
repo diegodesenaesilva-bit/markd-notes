@@ -1,4 +1,4 @@
-import { Link2, PenTool, Settings, X } from "lucide-react";
+import { Link2, PenTool, Settings, Wand2, X } from "lucide-react";
 import { motion } from "motion/react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { GeminiIcon } from "@/components/ui/GeminiIcon";
@@ -8,6 +8,7 @@ import { LinkedMentions } from "./LinkedMentions";
 import { AskMarkSidebar } from "./AskMarkSidebar";
 import { WritingAssistantSidebar } from "./WritingAssistantSidebar";
 import { useUi } from "@/stores/ui";
+import { useCopilot } from "@/stores/copilot";
 
 const WIDTH = 380;
 
@@ -52,6 +53,10 @@ export function BacklinksSidebar({
     openSettings,
   } = useUi();
 
+  const copilotMode = useCopilot((s) => s.copilotMode);
+  const setCopilotMode = useCopilot((s) => s.setCopilotMode);
+  const inlineComments = useCopilot((s) => s.inlineComments);
+
   const visible = rightPanelOpen;
 
   return (
@@ -67,16 +72,41 @@ export function BacklinksSidebar({
           <div className="flex items-center gap-0.5 rounded-lg bg-bg/80 p-0.5 border border-line-soft overflow-x-auto [scrollbar-width:none]">
             <button
               type="button"
-              onClick={() => setRightPanelTab("mark")}
+              onClick={() => {
+                setRightPanelTab("mark");
+                setCopilotMode(false);
+              }}
               className={cx(
                 "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-100 shrink-0",
-                rightPanelTab === "mark"
+                rightPanelTab === "mark" && !copilotMode
                   ? "bg-purple-500/15 text-purple-600 dark:text-purple-400 font-semibold shadow-2xs"
                   : "text-muted hover:text-ink hover:bg-hover"
               )}
             >
-              <GeminiIcon size={13} animated={rightPanelTab === "mark"} />
+              <GeminiIcon size={13} animated={rightPanelTab === "mark" && !copilotMode} />
               <span>Peça ao Gemini</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setRightPanelTab("mark");
+                setCopilotMode(true);
+              }}
+              className={cx(
+                "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-100 shrink-0",
+                rightPanelTab === "mark" && copilotMode
+                  ? "bg-purple-600 text-white font-semibold shadow-2xs"
+                  : "text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
+              )}
+            >
+              <Wand2 size={13} />
+              <span>Copiloto</span>
+              {inlineComments.length > 0 && (
+                <span className="ml-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-purple-400 px-1 text-[9px] font-bold text-slate-950">
+                  {inlineComments.length}
+                </span>
+              )}
             </button>
 
             <button
