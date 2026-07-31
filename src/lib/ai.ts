@@ -235,6 +235,8 @@ async function chatWithGemini(
         noteTitle: contextHeader,
         useSearchGrounding,
         images,
+        apiKey: apiKey?.trim() || "",
+        model: model || "gemini-2.5-flash",
       }),
     });
 
@@ -246,9 +248,17 @@ async function chatWithGemini(
           groundingMetadata: data.groundingMetadata,
         };
       }
+    } else if (res.status !== 404) {
+      const errData = await res.json().catch(() => ({}));
+      if (errData.error) {
+        throw new Error(errData.error);
+      }
     }
-  } catch {
-    // Expected on standalone desktop Tauri app
+  } catch (err: any) {
+    if (err instanceof Error && err.message && !err.message.includes("Failed to fetch") && !err.message.includes("NetworkError") && !err.message.includes("fetch")) {
+      throw err;
+    }
+    // Expected on standalone desktop Tauri app with no server
   }
 
   // 2. Resolve API Key: user personal key -> environment variable

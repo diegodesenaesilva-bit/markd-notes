@@ -119,6 +119,7 @@ export function AskMarkSidebar({
 
   const {
     activeProvider,
+    geminiApiKey,
     groqApiKey,
     openaiApiKey,
     claudeApiKey,
@@ -416,7 +417,7 @@ export function AskMarkSidebar({
       const res = await fetch("/api/gemini/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: cleanText.slice(0, 400) }),
+        body: JSON.stringify({ text: cleanText.slice(0, 400), apiKey: geminiApiKey }),
       });
 
       if (res.ok) {

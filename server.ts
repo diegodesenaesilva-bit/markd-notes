@@ -20,15 +20,24 @@ const ai = new GoogleGenAI({
 
 app.post("/api/gemini/generate", async (req, res) => {
   try {
-    const { prompt, noteTitle, noteContent, action, messages, useSearchGrounding, images } = req.body;
+    const { prompt, noteTitle, noteContent, action, messages, useSearchGrounding, images, apiKey: clientApiKey, model: clientModel } = req.body;
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = (clientApiKey || process.env.GEMINI_API_KEY || "").trim();
     if (!apiKey) {
       return res.status(400).json({
         error:
-          "GEMINI_API_KEY não configurada no servidor. Verifique suas variáveis no painel Settings > Secrets.",
+          "Chave da API do Google Gemini não configurada. Verifique suas variáveis no painel Settings > Secrets ou adicione sua chave do Google AI Studio nas Configurações.",
       });
     }
+
+    const clientAi = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
 
     const systemInstruction =
       "Você é o Mark IA, o assistente inteligente nativo do Markd (um aplicativo de notas e produtividade local-first minimalista). Sua função é ajudar o usuário a escrever, analisar notas, escanear imagens e documentos, agendar compromissos, organizar tarefas e responder a dúvidas com dados atualizados da web. Responda em Português do Brasil com excelente clareza, tom útil e formatação Markdown limpa e bem estruturada.";
@@ -90,8 +99,13 @@ app.post("/api/gemini/generate", async (req, res) => {
       config.tools = [{ googleSearch: {} }];
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.6-flash",
+    let targetModel = (clientModel || "gemini-2.5-flash").trim();
+    if (targetModel.includes("3.6") || targetModel === "gemini-3.6-flash") {
+      targetModel = "gemini-2.5-flash";
+    }
+
+    const response = await clientAi.models.generateContent({
+      model: targetModel,
       contents: parts.length > 1 ? parts : fullPrompt,
       config,
     });
@@ -113,18 +127,27 @@ app.post("/api/gemini/generate", async (req, res) => {
 
 app.post("/api/gemini/tts", async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text, apiKey: clientApiKey } = req.body;
     if (!text) {
       return res.status(400).json({ error: "Texto necessário para síntese de voz." });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = (clientApiKey || process.env.GEMINI_API_KEY || "").trim();
     if (!apiKey) {
       return res.status(400).json({ error: "GEMINI_API_KEY não configurada no servidor." });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-tts-preview",
+    const clientAi = new GoogleGenAI({
+      apiKey,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+
+    const response = await clientAi.models.generateContent({
+      model: "gemini-2.5-flash",
       contents: [{ parts: [{ text }] }],
       config: {
         responseModalities: ["AUDIO" as any],
