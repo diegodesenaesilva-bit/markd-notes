@@ -89,6 +89,7 @@ function syncVersions() {
   // Sanitize updater and security
   if (!conf.bundle) conf.bundle = {};
   conf.bundle.createUpdaterArtifacts = true;
+  conf.bundle.category = "Productivity";
   if (!conf.app) conf.app = {};
   if (!conf.app.security) conf.app.security = { csp: null };
   conf.app.security.assetProtocol = { enable: true, scope: [] };
