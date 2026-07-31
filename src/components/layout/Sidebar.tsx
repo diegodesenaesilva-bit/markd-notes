@@ -245,6 +245,7 @@ export function Sidebar() {
                 onDragStart={() => setDraggedKey(key)}
                 onDragOver={(e) => {
                   e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
                   setDragOverKey(key);
                 }}
                 onDragLeave={() => setDragOverKey(null)}

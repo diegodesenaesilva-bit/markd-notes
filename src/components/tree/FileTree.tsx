@@ -1,7 +1,9 @@
 import {
   DndContext,
   DragOverlay,
+  MouseSensor,
   PointerSensor,
+  TouchSensor,
   pointerWithin,
   useDraggable,
   useDroppable,
@@ -73,6 +75,8 @@ export function FileTree() {
     node: TreeNode;
   } | null>(null);
   const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
   );
   const visibleTree = useMemo(
@@ -304,7 +308,8 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
         aria-expanded={isFolder ? isOpen : undefined}
         tabIndex={api?.focusRel === node.rel ? 0 : -1}
         className={cx(
-          "group relative flex h-[30px] touch-none cursor-pointer items-center rounded-md pr-1.5 text-[13px] transition-all duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink",
+          "group relative flex h-[30px] touch-none select-none items-center rounded-md pr-1.5 text-[13px] transition-all duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ink",
+          !isRenaming ? "cursor-grab active:cursor-grabbing" : "cursor-default",
           isActive
             ? "bg-active text-ink"
             : "text-muted hover:bg-hover hover:text-ink",
@@ -408,6 +413,7 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
                   type="button"
                   title="Nova nota nesta pasta"
                   onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -422,6 +428,7 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
                   type="button"
                   title={isOpen ? "Ocultar notas" : "Expandir pasta"}
                   onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
                   onClick={(e) => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -437,6 +444,7 @@ function Row({ node, depth }: { node: TreeNode; depth: number }) {
               type="button"
               title="Mover para a lixeira"
               onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               onClick={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
