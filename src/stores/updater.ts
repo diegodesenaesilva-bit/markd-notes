@@ -89,9 +89,18 @@ export const useUpdater = create<UpdaterState>((set, get) => ({
       await update.downloadAndInstall();
       set({ status: "ready" });
       await relaunch();
-    } catch (err) {
+    } catch (err: any) {
       set({ status: "available" });
-      toast.error(err instanceof Error ? err.message : "Update failed to install.");
+      const errorMsg =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : typeof err === "object" && err !== null && "message" in err
+              ? String(err.message)
+              : JSON.stringify(err);
+      console.error("Update installation error:", err);
+      toast.error(`Falha ao instalar a atualização: ${errorMsg}`);
     }
   },
 
