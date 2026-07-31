@@ -14,7 +14,7 @@ Your notes live on your disk as plain `.md` files. Markd simply makes writing an
 
 ## Installing on Windows
 
-Download the latest `.exe` setup installer or `.msi` package from the [GitHub releases](https://github.com/starc007/markd/releases/latest) page and run the setup.
+Download the latest `.exe` setup installer or `.msi` package from the [GitHub releases](https://github.com/diegodesenaesilva-bit/markd-notes/releases/latest) page and run the setup.
 
 ---
 
