@@ -10,16 +10,8 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-<<<<<<< HEAD
-<<<<<<< HEAD
     version: "0.3.16",
-=======
-    version: "0.3.16",
->>>>>>> a3be5c7 (feat(copilot): implement Copilot mode, inline comments, and update version to 0.3.16)
-=======
-    version: "0.3.7",
->>>>>>> a971586 (fix: re-apply universal self-healing auto-sync scripts to fix v0.3.7 release build)
-    date: "2026-07-21",
+    date: "2026-07-31",
     displayDate: "July 21, 2026",
     title: "Publish and stay in control",
     summary:

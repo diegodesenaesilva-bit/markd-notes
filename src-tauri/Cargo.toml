@@ -1,10 +1,6 @@
 [package]
 name = "Markd"
-<<<<<<< HEAD
 version = "0.3.16"
-=======
-version = "0.3.16"
->>>>>>> a3be5c7 (feat(copilot): implement Copilot mode, inline comments, and update version to 0.3.16)
 description = "Local-first markdown notes"
 authors = ["Saurabh"]
 license = "MIT"
