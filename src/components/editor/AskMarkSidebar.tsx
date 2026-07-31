@@ -19,6 +19,10 @@ import {
   VolumeX,
   Image as ImageIcon,
   ExternalLink,
+  RotateCcw,
+  Wand2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { chatWithOnlineAi, cleanAiMarkdown, type ChatMessage } from "@/lib/ai";
 import { useAiStore } from "@/stores/ai";
@@ -35,6 +39,12 @@ import { toast } from "sonner";
 interface ExtendedChatMessage extends ChatMessage {
   groundingMetadata?: any;
   images?: string[];
+  proposedNoteUpdate?: {
+    explanation?: string;
+    content: string;
+    applied: boolean;
+    previousContent?: string;
+  };
 }
 
 interface AttachedImage {
@@ -73,6 +83,11 @@ export function AskMarkSidebar({
   const [attachedImages, setAttachedImages] = useState<AttachedImage[]>([]);
   const [isListening, setIsListening] = useState(false);
   const [playingAudioIndex, setPlayingAudioIndex] = useState<number | null>(null);
+
+  // Copilot Mode State
+  const [copilotMode, setCopilotMode] = useState(true);
+  const [autoApplyCopilot, setAutoApplyCopilot] = useState(false);
+  const [expandedPreviewIndex, setExpandedPreviewIndex] = useState<number | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -132,7 +147,12 @@ export function AskMarkSidebar({
     if (!text) return "";
     return text
       .replace(/```json[\s\S]*?```/gi, (match) => {
-        if (match.includes('"action"') || match.includes('action') || match.includes('add_')) {
+        if (
+          match.includes('"action"') ||
+          match.includes('action') ||
+          match.includes('add_') ||
+          match.includes('update_active_note')
+        ) {
           return "";
         }
         return match;
@@ -141,16 +161,55 @@ export function AskMarkSidebar({
       .trim();
   };
 
-  const executeAiAction = (responseText: string): string[] => {
+  const executeAiAction = (
+    responseText: string
+  ): { logs: string[]; proposedUpdate?: any } => {
     const executedLogs: string[] = [];
+    let proposedUpdate: any = null;
     try {
       const jsonMatches = responseText.match(/```json[\s\S]*?```/gi);
-      if (!jsonMatches) return executedLogs;
+      if (!jsonMatches) return { logs: executedLogs, proposedUpdate };
 
       const processSingleAction = (data: any) => {
         if (!data || typeof data !== "object") return;
-        // 1. Calendar Event
-        if (data.action === "add_calendar_event" && data.title) {
+
+        // 1. Copilot Note Update Action
+        if (
+          (data.action === "update_active_note" || data.action === "update_note") &&
+          (data.updatedContent || data.content)
+        ) {
+          const contentToApply = data.updatedContent || data.content;
+          const explanation =
+            data.explanation || "Nota atualizada com base nas suas instruções.";
+
+          if (autoApplyCopilot) {
+            window.dispatchEvent(
+              new CustomEvent("markd:note-action", {
+                detail: { action: "replace-entire-note", text: contentToApply },
+              })
+            );
+            executedLogs.push("⚡ Nota central atualizada automaticamente pelo Copiloto");
+            toast.success("Nota central atualizada pelo Copiloto!");
+            proposedUpdate = {
+              explanation,
+              content: contentToApply,
+              applied: true,
+              previousContent: noteContent,
+            };
+          } else {
+            executedLogs.push(
+              "Proposta de alteração gerada. Clique em 'Aplicar na Nota Central' para confirmar."
+            );
+            proposedUpdate = {
+              explanation,
+              content: contentToApply,
+              applied: false,
+              previousContent: noteContent,
+            };
+          }
+        }
+        // 2. Calendar Event
+        else if (data.action === "add_calendar_event" && data.title) {
           useCalendar.getState().addEvent({
             title: data.title,
             date: data.date || new Date().toISOString().split("T")[0],
@@ -161,7 +220,7 @@ export function AskMarkSidebar({
           });
           executedLogs.push(`Compromisso agendado: "${data.title}"`);
         }
-        // 2. Todo
+        // 3. Todo
         else if (data.action === "add_todo" && data.text) {
           void useTodos.getState().addSmart({
             text: data.text,
@@ -169,7 +228,7 @@ export function AskMarkSidebar({
           });
           executedLogs.push(`Tarefa criada: "${data.text}"`);
         }
-        // 3. Canvas Node (Moodboard)
+        // 4. Canvas Node (Moodboard)
         else if (data.action === "add_canvas_node" && (data.content || data.title)) {
           useCanvas.getState().addNode({
             type: data.type || "sticky",
@@ -180,7 +239,9 @@ export function AskMarkSidebar({
             y: 120 + Math.floor(Math.random() * 220),
           });
           executedLogs.push(
-            `Item adicionado ao Moodboard: "${data.title || (data.content ? data.content.slice(0, 25) + '...' : 'Card')}"`
+            `Item adicionado ao Moodboard: "${
+              data.title || (data.content ? data.content.slice(0, 25) + "..." : "Card")
+            }"`
           );
         }
       };
@@ -201,7 +262,61 @@ export function AskMarkSidebar({
     } catch {
       // ignore
     }
-    return executedLogs;
+    return { logs: executedLogs, proposedUpdate };
+  };
+
+  const handleApplyProposedUpdate = (content: string, index: number) => {
+    const previousContent = noteContent;
+    window.dispatchEvent(
+      new CustomEvent("markd:note-action", {
+        detail: { action: "replace-entire-note", text: content },
+      })
+    );
+    setMessages((prev) =>
+      prev.map((msg, idx) => {
+        if (idx === index && msg.proposedNoteUpdate) {
+          return {
+            ...msg,
+            proposedNoteUpdate: {
+              ...msg.proposedNoteUpdate,
+              applied: true,
+              previousContent,
+            },
+          };
+        }
+        return msg;
+      })
+    );
+    toast.success("Nota central atualizada com sucesso!");
+  };
+
+  const handleUndoProposedUpdate = (index: number) => {
+    const targetMsg = messages[index];
+    if (targetMsg?.proposedNoteUpdate?.previousContent !== undefined) {
+      window.dispatchEvent(
+        new CustomEvent("markd:note-action", {
+          detail: {
+            action: "replace-entire-note",
+            text: targetMsg.proposedNoteUpdate.previousContent,
+          },
+        })
+      );
+      setMessages((prev) =>
+        prev.map((msg, idx) => {
+          if (idx === index && msg.proposedNoteUpdate) {
+            return {
+              ...msg,
+              proposedNoteUpdate: {
+                ...msg.proposedNoteUpdate,
+                applied: false,
+              },
+            };
+          }
+          return msg;
+        })
+      );
+      toast.info("Conteúdo anterior da nota restaurado.");
+    }
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -440,12 +555,32 @@ Para ADICIONAR sticky notes no Moodboard, inclua blocos JSON com a ação "add_c
 \`\`\`
 \n\n`;
     } else if (shareContext) {
-      contextHeader += `[CONTEXTO DA NOTA ATUAL]:
-Título: ${noteTitle}
-Conteúdo da Nota:
+      contextHeader += `[CONTEXTO DA NOTA ATUAL DO USUÁRIO]:
+Título da Nota: ${noteTitle}
+${selectedText ? `TRECHO GRIFADO/SELEÇÃO ATUAL DO USUÁRIO NA NOTA:\n"""\n${selectedText}\n"""\n` : ""}
+Conteúdo Atual da Nota:
 ---
-${selectedText || noteContent || "(Nota Vazia)"}
+${noteContent || "(Nota Vazia)"}
 ---
+
+${
+  copilotMode
+    ? `[MODO COPILOTO DE EDIÇÃO DA NOTA ATIVO]:
+Você está operando como um Copiloto Direto de Edição de Texto no Markd.
+Sua missão:
+1. Responda amigavelmente no chat explicando o que você analisou, revisou ou reescreveu ("avisando no chat o que está sendo feito").
+2. Se a solicitação do usuário envolver reescrever, melhorar, aplicar um comentário, organizar, resumir, corrigir gramática ou fazer qualquer alteração no texto da nota, COLOQUE OBRIGATORIAMENTE ao final da sua resposta um bloco de código JSON com a ação "update_active_note":
+\`\`\`json
+{
+  "action": "update_active_note",
+  "explanation": "Resumo em 1 frase do que foi modificado",
+  "updatedContent": "CONTEÚDO COMPLETO E ATUALIZADO DA NOTA EM MARKDOWN"
+}
+\`\`\`
+Preserve o formato Markdown da nota e mantenha os títulos e estrutura não afetados pela alteração.
+`
+    : ""
+}
 \n\n`;
     }
 
@@ -459,7 +594,10 @@ ${selectedText || noteContent || "(Nota Vazia)"}
       });
 
       const responseText = responseObj.text;
-      executeAiAction(responseText);
+      const { logs: actionLogs, proposedUpdate } = executeAiAction(responseText);
+      if (actionLogs.length > 0) {
+        toast.success(actionLogs.join("\n"));
+      }
 
       const cleanedText = stripActionJson(responseText);
 
@@ -469,6 +607,7 @@ ${selectedText || noteContent || "(Nota Vazia)"}
           role: "assistant",
           text: cleanedText,
           groundingMetadata: responseObj.groundingMetadata,
+          proposedNoteUpdate: proposedUpdate,
         },
       ]);
     } catch (err: any) {
@@ -637,6 +776,67 @@ ${selectedText || noteContent || "(Nota Vazia)"}
                 >
                   <X size={14} />
                 </button>
+              </div>
+            )}
+
+            {currentViewType === "note" && (
+              <div className="flex items-center justify-between rounded-xl border border-purple-500/30 bg-purple-500/5 px-3 py-2 text-xs shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <div className="grid h-6 w-6 place-items-center rounded-lg bg-purple-500/20 text-purple-600 dark:text-purple-400">
+                    <Wand2 size={13} />
+                  </div>
+                  <div>
+                    <div className="font-semibold text-ink flex items-center gap-1.5">
+                      Copiloto da Nota
+                      {copilotMode && (
+                        <span className="inline-flex items-center rounded-full bg-purple-500/20 px-1.5 py-0.2 text-[9px] font-bold text-purple-600 dark:text-purple-400">
+                          ATIVO
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-faint">Edita a nota conforme o chat</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAutoApplyCopilot(!autoApplyCopilot);
+                      toast(
+                        !autoApplyCopilot
+                          ? "Auto-aplicar ativado! As edições serão salvas na nota em tempo real."
+                          : "Modo confirmação ativado! Você verá um card com o botão 'Aplicar' antes de salvar na nota."
+                      );
+                    }}
+                    className={cx(
+                      "px-2 py-1 rounded-lg text-[10.5px] font-medium transition-colors border",
+                      autoApplyCopilot
+                        ? "bg-purple-600 text-white border-purple-600"
+                        : "bg-hover text-faint border-line hover:text-ink"
+                    )}
+                    title={
+                      autoApplyCopilot
+                        ? "Alterações aplicadas na nota automaticamente"
+                        : "Exibe um botão 'Aplicar na Nota' antes de alterar a nota"
+                    }
+                  >
+                    {autoApplyCopilot ? "⚡ Auto-Aplicar" : "✋ Confirmação"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCopilotMode(!copilotMode)}
+                    className={cx(
+                      "px-2 py-1 rounded-lg text-[10.5px] font-medium transition-colors border",
+                      copilotMode
+                        ? "bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/40"
+                        : "bg-hover text-faint border-line hover:text-ink"
+                    )}
+                  >
+                    {copilotMode ? "Ligado" : "Desligado"}
+                  </button>
+                </div>
               </div>
             )}
 
@@ -838,6 +1038,98 @@ ${selectedText || noteContent || "(Nota Vazia)"}
                 )}
               </div>
             )}
+
+            {/* Proposed Note Update Card */}
+            {msg.proposedNoteUpdate && (
+              <div className="mt-2.5 rounded-xl border border-purple-500/30 bg-purple-500/5 p-3 space-y-2 select-none shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400">
+                    <Sparkles size={14} />
+                    <span>Proposta de Edição da Nota Central</span>
+                  </div>
+                  {msg.proposedNoteUpdate.applied ? (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      <Check size={12} /> Aplicado
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/20 px-2 py-0.5 text-[10px] font-medium text-purple-600 dark:text-purple-400">
+                      Aguardando Revisão
+                    </span>
+                  )}
+                </div>
+
+                {msg.proposedNoteUpdate.explanation && (
+                  <p className="text-[11.5px] text-faint leading-relaxed">
+                    {msg.proposedNoteUpdate.explanation}
+                  </p>
+                )}
+
+                <div className="rounded-lg border border-line-soft bg-bg/80 p-2">
+                  <div className="flex items-center justify-between text-[10.5px] font-medium text-faint">
+                    <span>Novo Conteúdo ({msg.proposedNoteUpdate.content.length} caracteres)</span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExpandedPreviewIndex(expandedPreviewIndex === index ? null : index)
+                      }
+                      className="hover:text-ink flex items-center gap-1 text-purple-500"
+                    >
+                      {expandedPreviewIndex === index ? (
+                        <>Ocultar <ChevronUp size={12} /></>
+                      ) : (
+                        <>Ver Código <ChevronDown size={12} /></>
+                      )}
+                    </button>
+                  </div>
+                  <div
+                    className={cx(
+                      "mt-1 text-[11px] font-mono text-faint overflow-hidden transition-all whitespace-pre-wrap",
+                      expandedPreviewIndex === index
+                        ? "max-h-60 overflow-y-auto"
+                        : "line-clamp-3"
+                    )}
+                  >
+                    {msg.proposedNoteUpdate.content}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-1">
+                  {!msg.proposedNoteUpdate.applied ? (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        handleApplyProposedUpdate(msg.proposedNoteUpdate!.content, index)
+                      }
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-purple-600 px-3 py-1.5 text-xs font-medium text-white shadow-xs hover:bg-purple-700 transition-colors"
+                    >
+                      <Check size={13} />
+                      Aplicar Alterações na Nota
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleUndoProposedUpdate(index)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-line bg-hover px-2.5 py-1 text-[11px] font-medium text-faint hover:text-ink transition-colors"
+                    >
+                      <RotateCcw size={12} />
+                      Desfazer e Restaurar
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(msg.proposedNoteUpdate!.content);
+                      toast.success("Markdown copiado!");
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-line bg-hover px-2.5 py-1 text-[11px] font-medium text-faint hover:text-ink transition-colors"
+                  >
+                    <Copy size={12} />
+                    Copiar Markdown
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         ))}
 
@@ -882,7 +1174,51 @@ ${selectedText || noteContent || "(Nota Vazia)"}
       )}
 
       {/* Input Bar */}
-      <div className="border-t border-line bg-panel/30 p-3">
+      <div className="border-t border-line bg-panel/30 p-3 space-y-2">
+        {selectedText && currentViewType === "note" && (
+          <div className="flex flex-col gap-1.5 rounded-xl border border-purple-500/30 bg-purple-500/10 p-2.5 text-xs text-ink shadow-2xs">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-purple-600 dark:text-purple-400">
+              <span className="flex items-center gap-1.5 truncate">
+                <Sparkles size={13} />
+                Trecho Grifado na Nota ({selectedText.length} caracteres)
+              </span>
+              <span className="text-[10px] text-purple-500/80 font-normal">Contexto Ativo</span>
+            </div>
+            <p className="line-clamp-2 text-[11px] text-faint italic font-mono bg-bg/60 p-1.5 rounded border border-line-soft">
+              "{selectedText}"
+            </p>
+            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() =>
+                  handleSendMessage("Reescreva o trecho grifado/selecionado tornando-o mais claro, fluido e bem articulado.")
+                }
+                className="rounded-lg bg-purple-500/20 px-2 py-1 text-[11px] font-medium text-purple-700 dark:text-purple-300 hover:bg-purple-500/30 transition-colors"
+              >
+                ✨ Reescrever Trecho
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSendMessage("Expanda e desenvolva com mais detalhes as ideias contidas no trecho grifado.")
+                }
+                className="rounded-lg bg-indigo-500/20 px-2 py-1 text-[11px] font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-500/30 transition-colors"
+              >
+                📝 Expandir
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleSendMessage("Corrija gramática, pontuação e ortografia do trecho grifado.")
+                }
+                className="rounded-lg bg-emerald-500/20 px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+              >
+                🧹 Polir / Corrigir
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="relative rounded-2xl border border-line bg-panel p-2 shadow-sm focus-within:border-purple-500">
           <textarea
             rows={2}

@@ -721,6 +721,34 @@ export const NoteEditor = memo(function NoteEditor({
           if (detail?.text) {
             handleInsertAiResult(detail.text, detail.replace ?? false);
           }
+        } else if (action === "replace-entire-note") {
+          const detail = (event as CustomEvent<{ text?: string }>).detail;
+          if (detail?.text !== undefined) {
+            const notes = flattenNotes(useVault.getState().tree);
+            let cleanedText = detail.text.trim();
+            if (cleanedText.startsWith("```markdown")) {
+              cleanedText = cleanedText.replace(/^```markdown\s*/i, "").replace(/\s*```$/, "");
+            } else if (cleanedText.startsWith("```md")) {
+              cleanedText = cleanedText.replace(/^```md\s*/i, "").replace(/\s*```$/, "");
+            } else if (cleanedText.startsWith("```")) {
+              cleanedText = cleanedText.replace(/^```\s*/i, "").replace(/\s*```$/, "");
+            }
+
+            if (markdownSource) {
+              applyRawTextChange(joinFrontmatter(frontmatter.current, cleanedText));
+            } else if (editor) {
+              swapping.current = true;
+              editor.commands.setContent(wikiToMarkdown(cleanedText, notes, relRef.current), {
+                contentType: "markdown",
+              });
+              swapping.current = false;
+              const newMarkdown = editor.getMarkdown();
+              pending.current = newMarkdown;
+              setSaveState("saving");
+              debouncedPersist(newMarkdown);
+            }
+            toast.success("Nota central atualizada com sucesso!");
+          }
         } else if (action === "add-property") {
           setPropertyAddRequest((request) => request + 1);
         } else if (action === "copy") {

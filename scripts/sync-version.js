@@ -86,13 +86,7 @@ function syncVersions() {
 
   const conf = readJsonFile(tauriConfPath);
   
-  // Sanitize updater and security
-  if (!conf.bundle) conf.bundle = {};
-  conf.bundle.createUpdaterArtifacts = true;
-  conf.bundle.category = "Productivity";
-  if (!conf.app) conf.app = {};
-  if (!conf.app.security) conf.app.security = { csp: null };
-  conf.app.security.assetProtocol = { enable: true, scope: [] };
+  // Sanitize updater
   if (!conf.plugins) conf.plugins = {};
   if (!conf.plugins.updater) conf.plugins.updater = {};
   if (conf.plugins.updater.pubkey !== CORRECT_PUBKEY) conf.plugins.updater.pubkey = CORRECT_PUBKEY;
