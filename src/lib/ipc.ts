@@ -29,7 +29,7 @@ export class IpcError extends Error {
   }
 }
 
-function isTauriAvailable(): boolean {
+export function isTauriAvailable(): boolean {
   return (
     typeof window !== "undefined" &&
     Boolean((window as any).__TAURI_INTERNALS__) &&
@@ -778,4 +778,5 @@ export const ipc = {
   canvasListSave: (list: CanvasMeta[]) => call<void>("canvas_list_save", { list }),
   setTheme: (theme: Theme) => call<void>("set_theme", { theme }),
   getTheme: () => call<Theme>("get_theme"),
+  geminiGenerate: (url: string, body: string) => call<string>("gemini_generate", { url, body }),
 };

@@ -1,4 +1,5 @@
 import { useAiStore } from "@/stores/ai";
+import { ipc, isTauriAvailable } from "@/lib/ipc";
 
 export interface ChatMessage {
   role: "user" | "assistant" | "system";
@@ -308,6 +309,35 @@ async function chatWithGemini(
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:generateContent?key=${effectiveKey}`;
+
+  // If running inside desktop Tauri app, use Rust native reqwest to bypass WebView CORS
+  if (isTauriAvailable()) {
+    try {
+      const responseText = await ipc.geminiGenerate(url, JSON.stringify(reqBody));
+      let data: any = {};
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        data = { rawText: responseText };
+      }
+
+      const candidate = data.candidates?.[0];
+      const resultText = candidate?.content?.parts?.[0]?.text;
+      if (!resultText) {
+        if (data.error?.message) {
+          throw new Error(`Erro na API do Google Gemini: ${data.error.message}`);
+        }
+        throw new Error("O Google Gemini não retornou nenhum texto de resposta.");
+      }
+
+      return {
+        text: resultText,
+        groundingMetadata: candidate?.groundingMetadata,
+      };
+    } catch (err: any) {
+      throw new Error(err.message || "Falha ao conectar com o Google Gemini via app desktop.");
+    }
+  }
 
   let res: Response;
   try {

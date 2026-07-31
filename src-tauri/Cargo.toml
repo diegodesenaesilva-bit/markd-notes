@@ -1,6 +1,6 @@
 [package]
 name = "Markd"
-version = "0.3.18"
+version = "0.3.19"
 description = "Local-first markdown notes"
 authors = ["Saurabh"]
 license = "MIT"

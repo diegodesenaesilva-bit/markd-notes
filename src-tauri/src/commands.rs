@@ -576,3 +576,31 @@ pub fn open_qwen_window(app: AppHandle) -> AppResult<()> {
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn gemini_generate(url: String, body: String) -> AppResult<String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(45))
+        .build()
+        .map_err(|e| AppError::Network(e.to_string()))?;
+
+    let response = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .body(body)
+        .send()
+        .await
+        .map_err(|e| AppError::Network(format!("Erro de rede ao conectar à API do Gemini: {e}")))?;
+
+    let status = response.status();
+    let text = response
+        .text()
+        .await
+        .map_err(|e| AppError::Network(format!("Falha ao ler resposta da API do Gemini: {e}")))?;
+
+    if !status.is_success() {
+        return Err(AppError::Network(format!("Erro da API do Gemini (HTTP {status}): {text}")));
+    }
+
+    Ok(text)
+}

@@ -26,6 +26,7 @@ import { useUi } from "@/stores/ui";
 import { useUpdater } from "@/stores/updater";
 import { useVault } from "@/stores/vault";
 import { FONT_OPTIONS, FONT_SIZES, ensureGoogleFont } from "@/lib/fonts";
+import { version as appVersion } from "../../../package.json";
 
 const THEMES: Array<{
   value: Theme;
@@ -112,7 +113,7 @@ export function GeneralSettings() {
         ? "Installing…"
         : updateStatus === "checking"
           ? "Checking for updates…"
-          : `You're on version ${updateVersion || "0.1.6"}`;
+          : `You're on version ${appVersion}`;
 
   return (
     <div className="space-y-6">
