@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const projectRoot = join(__dirname, "..");
 
-const CORRECT_PUBKEY = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmFzaWduIHB1YmxpYyBrZXk6IEEwRDM1NzE5MUYwMTM4MDkKUldTZUNSdzlVclcyNDlrdjcyS2FwZjdzUXRwbkF4bEFsODVsZmsyaTFlaXNlSEhPcFJvdHRnTHQK";
+const CORRECT_PUBKEY = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmFzaWduIHB1YmxpYyBrZXk6IEI1NTc1QTg3M0ZEMEZCRTMKUldUais5QS9oMXBYdGRxUWpRYW1IZ0hCbGxhbVdObjkyRVh5NVhWYTZEanVYbUVlaGRrb3hKQ2cK";
 const CORRECT_ENDPOINT = "https://github.com/diegodesenaesilva-bit/markd-notes/releases/latest/download/latest.json";
 
 function log(emoji, msg) {

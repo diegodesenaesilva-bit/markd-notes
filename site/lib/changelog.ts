@@ -11,7 +11,11 @@ export type ChangelogEntry = {
 export const CHANGELOG: ChangelogEntry[] = [
   {
 <<<<<<< HEAD
-    version: "0.3.8",
+<<<<<<< HEAD
+    version: "0.3.9",
+=======
+    version: "0.3.9",
+>>>>>>> dc99d71 (fix: update active Tauri signing public key B5575A873FD0FBE3 and bump version to 0.3.9)
 =======
     version: "0.3.7",
 >>>>>>> a971586 (fix: re-apply universal self-healing auto-sync scripts to fix v0.3.7 release build)
