@@ -12,7 +12,6 @@ import {
   PinOff,
   Pilcrow,
   PenTool,
-  Wand2,
   Search,
   Tag,
   Trash2,
@@ -83,7 +82,6 @@ export function AppShell() {
   const openRightPanel = useUi((s) => s.openRightPanel);
   const toggleMarkdownSource = useUi((s) => s.toggleMarkdownSource);
 
-  const copilotMode = useCopilot((s) => s.copilotMode);
   const setCopilotMode = useCopilot((s) => s.setCopilotMode);
   const inlineComments = useCopilot((s) => s.inlineComments);
   const createBookmarkTag = useBookmarks((s) => s.createTag);
@@ -175,31 +173,12 @@ export function AppShell() {
                         openRightPanel("mark");
                         setCopilotMode(false);
                       }}
-                      className="inline-flex h-7 select-none items-center gap-1.5 rounded-md border border-purple-500/30 bg-purple-500/10 px-2.5 text-[12.5px] font-medium text-purple-600 dark:text-purple-400 transition-colors duration-100 hover:bg-purple-500/20 active:scale-[0.98]"
+                      className="inline-flex h-7 select-none items-center gap-1.5 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-3 text-xs font-semibold text-white shadow-xs transition-all duration-100 hover:opacity-90 active:scale-[0.97]"
                     >
-                      <GeminiIcon size={13} />
+                      <GeminiIcon size={14} animated />
                       <span>Peça ao Gemini</span>
-                    </button>
-                  </Tooltip>
-
-                  <Tooltip label="Modo Copiloto (Revisão & Edição Direta da Nota)" side="bottom">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        openRightPanel("mark");
-                        setCopilotMode(true);
-                      }}
-                      className={cx(
-                        "inline-flex h-7 select-none items-center gap-1.5 rounded-md border px-2.5 text-[12.5px] font-medium transition-colors duration-100 active:scale-[0.98]",
-                        copilotMode
-                          ? "border-purple-600 bg-purple-600 text-white shadow-xs"
-                          : "border-purple-500/30 bg-purple-500/10 text-purple-600 dark:text-purple-400 hover:bg-purple-500/20"
-                      )}
-                    >
-                      <Wand2 size={13} />
-                      <span>Modo Copiloto</span>
                       {inlineComments.length > 0 && (
-                        <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-purple-400 px-1 text-[10px] font-bold text-slate-950">
+                        <span className="ml-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-white/20 px-1 text-[9px] font-bold text-white">
                           {inlineComments.length}
                         </span>
                       )}
@@ -210,10 +189,10 @@ export function AppShell() {
                     <button
                       type="button"
                       onClick={() => openRightPanel("writing-assistant")}
-                      className="inline-flex h-7 select-none items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 text-[12.5px] font-medium text-amber-600 dark:text-amber-400 transition-colors duration-100 hover:bg-amber-500/20 active:scale-[0.98]"
+                      className="inline-flex h-7 select-none items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 text-xs font-medium text-amber-600 dark:text-amber-400 transition-colors duration-100 hover:bg-amber-500/20 active:scale-[0.98]"
                     >
                       <PenTool size={13} className="text-amber-500" />
-                      <span className="hidden sm:inline">Assistente de Escrita</span>
+                      <span className="hidden sm:inline">Assistente</span>
                     </button>
                   </Tooltip>
                 </>

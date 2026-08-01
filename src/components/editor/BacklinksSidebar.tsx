@@ -1,4 +1,4 @@
-import { Link2, PenTool, Settings, Wand2, X } from "lucide-react";
+import { Link2, PanelRightClose, PenTool } from "lucide-react";
 import { motion } from "motion/react";
 import { Tooltip } from "@/components/ui/Tooltip";
 import { GeminiIcon } from "@/components/ui/GeminiIcon";
@@ -26,7 +26,7 @@ export function BacklinksToggle({
         aria-pressed={open}
         onClick={onToggle}
         className={cx(
-          "grid h-7 w-7 place-items-center rounded-md border transition-[color,background-color,border-color,transform] duration-100 active:scale-[0.96]",
+          "grid h-7 w-7 place-items-center rounded-full border transition-[color,background-color,border-color,transform] duration-100 active:scale-[0.96]",
           open
             ? "border-line-soft bg-invert text-invert-ink"
             : "border-line-soft bg-hover text-muted hover:bg-active hover:text-ink",
@@ -50,10 +50,8 @@ export function BacklinksSidebar({
     rightPanelTab,
     setRightPanelTab,
     closeRightPanel,
-    openSettings,
   } = useUi();
 
-  const copilotMode = useCopilot((s) => s.copilotMode);
   const setCopilotMode = useCopilot((s) => s.setCopilotMode);
   const inlineComments = useCopilot((s) => s.inlineComments);
 
@@ -67,97 +65,83 @@ export function BacklinksSidebar({
       className="h-full shrink-0 overflow-hidden border-l border-line bg-panel z-20"
     >
       <div style={{ width: WIDTH }} className="flex h-full flex-col">
-        {/* Unified Header with Tabs */}
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-line px-2.5 bg-sunken/40">
-          <div className="flex items-center gap-0.5 rounded-lg bg-bg/80 p-0.5 border border-line-soft overflow-x-auto [scrollbar-width:none]">
-            <button
-              type="button"
-              onClick={() => {
-                setRightPanelTab("mark");
-                setCopilotMode(false);
-              }}
-              className={cx(
-                "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-100 shrink-0",
-                rightPanelTab === "mark" && !copilotMode
-                  ? "bg-purple-500/15 text-purple-600 dark:text-purple-400 font-semibold shadow-2xs"
-                  : "text-muted hover:text-ink hover:bg-hover"
-              )}
-            >
-              <GeminiIcon size={13} animated={rightPanelTab === "mark" && !copilotMode} />
-              <span>Peça ao Gemini</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setRightPanelTab("mark");
-                setCopilotMode(true);
-              }}
-              className={cx(
-                "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-100 shrink-0",
-                rightPanelTab === "mark" && copilotMode
-                  ? "bg-purple-600 text-white font-semibold shadow-2xs"
-                  : "text-purple-600 dark:text-purple-400 hover:bg-purple-500/10"
-              )}
-            >
-              <Wand2 size={13} />
-              <span>Copiloto</span>
-              {inlineComments.length > 0 && (
-                <span className="ml-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-purple-400 px-1 text-[9px] font-bold text-slate-950">
-                  {inlineComments.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRightPanelTab("writing-assistant")}
-              className={cx(
-                "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-100 shrink-0",
-                rightPanelTab === "writing-assistant"
-                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 font-semibold shadow-2xs"
-                  : "text-muted hover:text-ink hover:bg-hover"
-              )}
-            >
-              <PenTool size={13} className={rightPanelTab === "writing-assistant" ? "text-amber-500" : "text-muted"} />
-              <span>Assistente</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setRightPanelTab("backlinks")}
-              className={cx(
-                "flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-all duration-100 shrink-0",
-                rightPanelTab === "backlinks"
-                  ? "bg-invert text-invert-ink font-semibold shadow-2xs"
-                  : "text-muted hover:text-ink hover:bg-hover"
-              )}
-            >
-              <Link2 size={13} />
-              <span>Mentions</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-0.5">
-            {rightPanelTab === "mark" && (
-              <button
-                type="button"
-                onClick={() => openSettings("general")}
-                className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-hover hover:text-ink"
-                title="Configurações de IA"
-              >
-                <Settings size={14} />
-              </button>
-            )}
+        {/* Unified Header with Centered Tabs and PanelRightClose on Left */}
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-line px-3 bg-sunken/40">
+          {/* Left: Collapse button */}
+          <Tooltip label="Recolher painel" side="bottom">
             <button
               type="button"
               onClick={closeRightPanel}
-              className="grid h-7 w-7 place-items-center rounded-md text-faint hover:bg-hover hover:text-ink"
-              title="Fechar painel"
+              className="grid h-7 w-7 place-items-center rounded-full text-muted hover:bg-hover hover:text-ink transition-colors active:scale-[0.96]"
             >
-              <X size={14} strokeWidth={1.9} />
+              <PanelRightClose size={16} strokeWidth={1.85} />
             </button>
+          </Tooltip>
+
+          {/* Center: Segmented Pill Tabs (Active shows text, Inactive shows icon-only) */}
+          <div className="flex items-center gap-1 rounded-full bg-sunken/70 p-1 border border-line-soft/60 shadow-2xs mx-auto">
+            {/* Gemini Tab */}
+            <Tooltip label="Peça ao Gemini" side="bottom">
+              <button
+                type="button"
+                onClick={() => {
+                  setRightPanelTab("mark");
+                  setCopilotMode(false);
+                }}
+                className={cx(
+                  "flex items-center gap-1.5 rounded-full text-xs font-medium transition-all duration-150 shrink-0",
+                  rightPanelTab === "mark"
+                    ? "bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white font-semibold shadow-sm px-3 py-1"
+                    : "px-2.5 py-1 text-muted hover:text-ink hover:bg-hover"
+                )}
+              >
+                <GeminiIcon size={14} animated={rightPanelTab === "mark"} />
+                {rightPanelTab === "mark" && <span>Peça ao Gemini</span>}
+                {inlineComments.length > 0 && (
+                  <span className="flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-white/20 px-1 text-[9px] font-bold text-white">
+                    {inlineComments.length}
+                  </span>
+                )}
+              </button>
+            </Tooltip>
+
+            {/* Assistente Tab */}
+            <Tooltip label="Assistente de Escrita" side="bottom">
+              <button
+                type="button"
+                onClick={() => setRightPanelTab("writing-assistant")}
+                className={cx(
+                  "flex items-center gap-1.5 rounded-full text-xs font-medium transition-all duration-150 shrink-0",
+                  rightPanelTab === "writing-assistant"
+                    ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 font-semibold shadow-xs px-3 py-1"
+                    : "px-2.5 py-1 text-muted hover:text-ink hover:bg-hover"
+                )}
+              >
+                <PenTool size={14} className={rightPanelTab === "writing-assistant" ? "text-amber-500" : "text-muted"} />
+                {rightPanelTab === "writing-assistant" && <span>Assistente</span>}
+              </button>
+            </Tooltip>
+
+            {/* Backlinks Tab */}
+            <Tooltip label="Menções Relacionadas" side="bottom">
+              <button
+                type="button"
+                onClick={() => setRightPanelTab("backlinks")}
+                className={cx(
+                  "flex items-center gap-1.5 rounded-full text-xs font-medium transition-all duration-150 shrink-0",
+                  rightPanelTab === "backlinks"
+                    ? "bg-invert text-invert-ink font-semibold shadow-xs px-3 py-1"
+                    : "px-2.5 py-1 text-muted hover:text-ink hover:bg-hover"
+                )}
+              >
+                <Link2 size={14} />
+                {rightPanelTab === "backlinks" && <span>Mencionados</span>}
+              </button>
+            </Tooltip>
           </div>
+
+          {/* Right spacer for symmetry */}
+          <div className="w-7" />
         </div>
 
         {/* Panel Body */}
